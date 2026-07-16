@@ -6,7 +6,18 @@
       "Bash(git init *)",
       "Bash(mkdir -p docs)",
       "Bash(git add *)",
-      "Bash(git commit -m 'chore: foundation — spec, CLAUDE.md, progress/decisions docs, env example *)"
+      "Bash(git commit -m 'chore: foundation — spec, CLAUDE.md, progress/decisions docs, env example *)",
+      "Bash(npm view *)",
+      "Bash(npx --yes create-next-app@latest _scaffold --typescript --eslint --tailwind --app --src-dir --turbopack --import-alias \"@/*\" --use-npm --skip-install --yes)",
+      "Bash(npx --yes create-next-app@latest scaffold-tmp --typescript --eslint --tailwind --app --src-dir --turbopack --import-alias \"@/*\" --use-npm --skip-install --yes)",
+      "PowerShell(Get-ChildItem -Force \"c:\\\\Users\\\\munth\\\\Desktop\\\\farm-project\\\\scaffold-tmp\"; try { Remove-Item -Recurse -Force -Confirm:$false \"c:\\\\Users\\\\munth\\\\Desktop\\\\farm-project\\\\scaffold-tmp\" -ErrorAction Stop; \"removed\" } catch { $_.Exception.Message })",
+      "Bash(npm install *)",
+      "Bash(npx --yes shadcn@latest init --yes --base-color neutral)",
+      "Bash(npx --yes shadcn@latest init --help)",
+      "Bash(npx --yes shadcn@latest init -b radix --rtl --yes --no-monorepo)",
+      "Bash(npx --yes shadcn@latest init -b radix -p vega --rtl --yes --no-monorepo)",
+      "Bash(npx --yes shadcn@latest add button card dialog dropdown-menu input label select sheet table tabs tooltip command popover badge skeleton separator avatar breadcrumb sidebar chart sonner switch checkbox form textarea scroll-area toggle toggle-group alert collapsible kbd empty --yes)",
+      "Bash(git commit --quiet -m 'feat: scaffold Next.js 16 with Tailwind v4 and shadcn/ui \\(radix, RTL\\) *)"
     ]
   }
 }
