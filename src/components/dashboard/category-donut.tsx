@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { Label, Pie, PieChart } from "recharts";
 import {
   ChartContainer,
@@ -12,16 +13,16 @@ import {
 import { formatMoneyCompact } from "@/lib/format";
 import type { CategorySlice } from "@/lib/demo/overview";
 
-const config = {
-  revenue: { label: "Revenue" },
-  sheep: { label: "Sheep", color: "var(--chart-1)" },
-  dairy: { label: "Dairy", color: "var(--chart-2)" },
-  cattle: { label: "Cattle", color: "var(--chart-3)" },
-  honey: { label: "Honey", color: "var(--chart-4)" },
-  wool: { label: "Wool", color: "var(--chart-5)" },
-} satisfies ChartConfig;
-
 export function CategoryDonut({ data }: { data: CategorySlice[] }) {
+  // Config is derived from the data so real category names label correctly.
+  const config = useMemo(() => {
+    const derived: ChartConfig = { revenue: { label: "Revenue" } };
+    data.forEach((slice, index) => {
+      derived[slice.key] = { label: slice.label, color: `var(--chart-${index + 1})` };
+    });
+    return derived;
+  }, [data]);
+
   const total = data.reduce((sum, slice) => sum + slice.revenue, 0);
   const chartData = data.map((slice) => ({
     ...slice,
