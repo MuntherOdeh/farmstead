@@ -31,6 +31,14 @@ Private farm-operations dashboard: Excel import with schema inference, product C
 
 After every milestone: `npm run typecheck && npm run lint && npm run build` → click through the app → commit → tick `docs/PROGRESS.md`.
 
+## Gotchas
+
+- **PGlite is single-writer**: stop the dev/prod server before `db:seed`, `db:migrate`, or any script touching `.pglite/`.
+- Local dev DB is PGlite (no `DATABASE_URL`); production is Neon via `DATABASE_URL`. `getDb()` in `src/db/index.ts` picks.
+- In auth helpers, `headers()` must be awaited **before** `getAuth()` so `next build` bails to dynamic rendering without touching the DB.
+- Viewer role is Better Auth's `"user"` (displayed "Viewer"); mutations require `requireAdmin()`.
+- Admin login: username `admin`, password in `.env.local` `ADMIN_PASSWORD` (never committed).
+
 ## Working rules (§13)
 
 - TypeScript strict. No `any`, no `@ts-ignore`, no `as unknown as`.

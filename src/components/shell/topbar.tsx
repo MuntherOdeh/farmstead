@@ -6,6 +6,7 @@ import { Kbd } from "@/components/ui/kbd";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { Breadcrumbs } from "@/components/shell/breadcrumbs";
+import { UserMenu } from "@/components/shell/user-menu";
 import { DensityToggle } from "@/components/theme/density-toggle";
 import { ThemePicker } from "@/components/theme/theme-picker";
 
@@ -38,6 +39,7 @@ export function Topbar({ onOpenPalette }: { onOpenPalette: () => void }) {
       </Button>
       <ThemePicker />
       <DensityToggle />
+      <UserMenu />
     </header>
   );
 }

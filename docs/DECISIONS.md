@@ -6,6 +6,22 @@ Dated entries for every deviation from `SPEC.md` and every non-obvious call.
 
 The owner asked for all milestones to be finished without further questions, and no Neon `DATABASE_URL` exists yet (and no Docker on this machine). Local dev therefore runs on **PGlite** (embedded, file-backed Postgres at `.pglite/`, gitignored) — real Postgres semantics, zero install. `src/db/index.ts` picks the driver at runtime: `DATABASE_URL` present → `@neondatabase/serverless` HTTP driver (the spec's locked choice); absent → PGlite via dynamic import so it never loads in production. The same drizzle migrations apply to both; `drizzle.config.ts` mirrors the switch for `db:*` commands. When the owner creates the Neon database, setting `DATABASE_URL` is the only change needed.
 
+## 2026-07-16 — Viewer role is Better Auth's "user"
+
+Better Auth's admin plugin types roles as `"user" | "admin"`. Rather than fight the types or cast, the read-only role IS `"user"`, displayed as "Viewer" in the UI. `requireAdmin()` gates every mutation on `role === "admin"`, so any non-admin account is read-only regardless of label.
+
+## 2026-07-16 — Admin seeding via a bootstrap auth instance
+
+Public sign-up is disabled at the auth config level, which also blocks the server-side `signUpEmail` call. First-run admin seeding therefore uses a second, private `betterAuth` instance with sign-up enabled (same adapter/database), then promotes the account with a direct role update. Only public Better Auth APIs, no internals.
+
+## 2026-07-16 — shadcn registry no longer ships `form`; hand-written
+
+The Radix registry for shadcn CLI 4.x does not provide the react-hook-form `form` wrapper. `src/components/ui/form.tsx` is the classic shadcn implementation, hand-written (adapted for the `radix-ui` combined package import).
+
+## 2026-07-16 — PGlite is single-writer
+
+Two processes must never open `.pglite/data` at once (the dev/prod server plus a script = two embedded Postgres instances on one directory). Stop the server before running `db:seed`/`db:migrate` or ad-hoc queries locally.
+
 ## 2026-07-16 — Expense rows reference service products
 
 `transactions.product_id` is NOT NULL in §6, but expenses (vet, transport, labour) aren't physical products. Rather than weaken the FK, the seed creates three ledger-only service products (`FS-0900…0902`, category Other). Keeps the schema strict and lets expenses group/filter like everything else.

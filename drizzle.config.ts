@@ -8,7 +8,7 @@ const url = process.env.DATABASE_URL;
 // Without DATABASE_URL, drizzle-kit targets the local PGlite data dir the app
 // falls back to in dev (src/db/index.ts).
 export default defineConfig({
-  schema: "./src/db/schema.ts",
+  schema: ["./src/db/schema.ts", "./src/db/auth-schema.ts"],
   out: "./drizzle",
   dialect: "postgresql",
   ...(url

@@ -8,9 +8,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
+import { requireUser } from "@/lib/auth/require-user";
+
 export const metadata: Metadata = { title: "Analytics" };
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  await requireUser();
   return (
     <Empty className="min-h-[60vh]">
       <EmptyHeader>

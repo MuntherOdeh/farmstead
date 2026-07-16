@@ -40,7 +40,16 @@
       "Bash(git commit --quiet -m 'feat: shell & design system — 12 AA themes, contrast gate, app shell, demo overview *)",
       "Bash(docker --version)",
       "Bash(timeout 12 npx drizzle-kit studio)",
-      "Bash(git commit --quiet -m 'feat: database — drizzle schema, migrations, driver-agnostic client, seasonal seed *)"
+      "Bash(git commit --quiet -m 'feat: database — drizzle schema, migrations, driver-agnostic client, seasonal seed *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(['react-hook-form','@hookform/resolvers','zod'].map\\(k=>k+': '+\\(p.dependencies[k]||'MISSING'\\)\\).join\\('\\\\n'\\)\\)\")",
+      "Bash(npx --yes shadcn@latest add form --yes)",
+      "Bash(timeout 30 bash -c 'until curl -sf http://localhost:3000/login >/dev/null; do sleep 1; done')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code} -> %{redirect_url}\\\\n\" http://localhost:3000/)",
+      "Bash(curl -sI http://localhost:3000/login)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:3000/api/auth/sign-in/username -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"wrong-password-123\"}')",
+      "Bash(node shot-auth.mjs)",
+      "Bash(git commit --quiet -m 'feat: auth — better-auth with username/admin plugins, guarded routes, rate limiting *)"
     ]
   }
 }

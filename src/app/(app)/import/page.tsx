@@ -8,9 +8,12 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 
+import { requireUser } from "@/lib/auth/require-user";
+
 export const metadata: Metadata = { title: "Import" };
 
-export default function ImportPage() {
+export default async function ImportPage() {
+  await requireUser();
   return (
     <Empty className="min-h-[60vh]">
       <EmptyHeader>
