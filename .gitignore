@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# next.js
+.next/
+out/
+next-env.d.ts
+
+# env — never commit secrets; .env.example is the only tracked env file
+.env
+.env.*
+!.env.example
+
+# builds & caches
+*.tsbuildinfo
+coverage/
+playwright-report/
+test-results/
+
+# vercel
+.vercel/
+
+# drizzle local artifacts (migrations themselves ARE committed)
+drizzle/.tmp/
+
+# os / editor
+.DS_Store
+Thumbs.db

@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --version)",
+      "Bash(git --version)",
+      "Bash(git init *)",
+      "Bash(mkdir -p docs)",
+      "Bash(git add *)",
+      "Bash(git commit -m 'chore: foundation — spec, CLAUDE.md, progress/decisions docs, env example *)"
+    ]
+  }
+}
