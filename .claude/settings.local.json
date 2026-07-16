@@ -17,7 +17,27 @@
       "Bash(npx --yes shadcn@latest init -b radix --rtl --yes --no-monorepo)",
       "Bash(npx --yes shadcn@latest init -b radix -p vega --rtl --yes --no-monorepo)",
       "Bash(npx --yes shadcn@latest add button card dialog dropdown-menu input label select sheet table tabs tooltip command popover badge skeleton separator avatar breadcrumb sidebar chart sonner switch checkbox form textarea scroll-area toggle toggle-group alert collapsible kbd empty --yes)",
-      "Bash(git commit --quiet -m 'feat: scaffold Next.js 16 with Tailwind v4 and shadcn/ui \\(radix, RTL\\) *)"
+      "Bash(git commit --quiet -m 'feat: scaffold Next.js 16 with Tailwind v4 and shadcn/ui \\(radix, RTL\\) *)",
+      "Bash(npx tsx *)",
+      "Bash(node -e \"const p=require\\('./package.json'\\); console.log\\(Object.keys\\(p.dependencies\\).join\\('\\\\n'\\)\\)\")",
+      "Skill(dataviz)",
+      "Skill(dataviz:*)",
+      "Bash(npm run *)",
+      "Bash(curl -s http://localhost:3000/)",
+      "Bash(grep -o -E \"Farmstead|Revenue &amp; costs|Revenue by category|Top products|Recent transactions|\\\\\\\\\\\\$46,900|Low stock|data-slot=\\\\\"sidebar\")",
+      "Skill(run)",
+      "Skill(run:*)",
+      "Bash(chromium-cli --session farmstead)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application/**)",
+      "Read(//c/Program Files/Microsoft/Edge/Application/**)",
+      "Read(//c/Program Files/Google/Chrome/Application/**)",
+      "Bash(npm init *)",
+      "Bash(npm i *)",
+      "Bash(mkdir -p screens)",
+      "Bash(node shot.mjs)",
+      "Bash(npx kill-port *)",
+      "Bash(timeout 30 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 1; done')",
+      "Bash(git commit --quiet -m 'feat: shell & design system — 12 AA themes, contrast gate, app shell, demo overview *)"
     ]
   }
 }

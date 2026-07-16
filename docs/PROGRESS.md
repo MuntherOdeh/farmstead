@@ -3,7 +3,7 @@
 Milestone checklist — tick items as they are finished and verified (typecheck + lint + build green, app clicked through, committed).
 
 - [x] **0 — Foundation.** Repo, `docs/SPEC.md`, `CLAUDE.md`, `PROGRESS.md`, `DECISIONS.md`, `.env.example`, `.gitignore`, npm scripts (scripts land with the scaffold in M1).
-- [ ] **1 — Shell & design system.** Next 16 + TS strict + Tailwind 4 + shadcn. All 7 themes with the contrast script passing. App shell: sidebar, topbar, breadcrumbs, ⌘K palette, theme picker, density toggle. Wired to fake data. Screenshot-able.
+- [x] **1 — Shell & design system.** Next 16.2.10 + TS strict + Tailwind 4 + shadcn (radix, RTL init). All 12 theme variants (6 palettes × light/dark) pass `check-contrast` at strict thresholds (text 4.5:1, UI 3:1, CVD ΔE ≥ 0.08, normal-vision ≥ 0.15), gate wired into `npm run build`. Shell: icon-collapsible sidebar, topbar with breadcrumbs, Ctrl+K palette, `g`-chord nav, `/` and `?` shortcuts, theme picker, density toggle. Overview wired to fake data (KPIs, revenue/costs area chart, category donut, top products, transactions, alerts). Verified in headless Edge across 4 themes + mobile viewport, zero console errors.
 - [ ] **2 — Database.** Neon + Drizzle, full schema, migrations, seed script. `npm run db:studio` works.
 - [ ] **3 — Auth.** Better Auth, login page, `requireUser()` everywhere, middleware redirect, rate limiting, admin seeded from env, change-password, viewer role.
 - [ ] **4 — Products CRUD.** The whole of §8, including custom categories / units / attributes.
