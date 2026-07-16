@@ -57,7 +57,8 @@
       "Bash(node -e \"const x=require\\('xlsx'\\); console.log\\('xlsx', x.version\\)\")",
       "Bash(curl -s -o /dev/null -w \"server: %{http_code}\\\\n\" http://localhost:3000/login)",
       "Bash(node drive-products.mjs)",
-      "Bash(git commit --quiet -m 'feat: products CRUD — table, slide-over form, custom categories/units/fields, bulk ops *)"
+      "Bash(git commit --quiet -m 'feat: products CRUD — table, slide-over form, custom categories/units/fields, bulk ops *)",
+      "Bash(npm test *)"
     ]
   }
 }

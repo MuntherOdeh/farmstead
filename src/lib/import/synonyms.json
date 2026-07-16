@@ -1,0 +1,32 @@
+{
+  "roles": {
+    "period": ["date", "day", "month", "period", "time", "when", "sold on", "sale date", "transaction date", "التاريخ", "تاريخ", "اليوم", "الشهر", "تاريخ البيع"],
+    "entity_type": ["type", "category", "kind", "group", "class", "product type", "item type", "النوع", "الفئة", "التصنيف", "الصنف"],
+    "entity_name": ["product", "item", "name", "product name", "item name", "description", "goods", "animal", "commodity", "المنتج", "البضاعة", "اسم المنتج", "الاسم", "الصنف", "المادة"],
+    "quantity": ["quantity", "qty", "count", "number", "amount sold", "units", "head", "heads", "pieces", "pcs", "no", "num", "عدد", "الكمية", "كمية", "العدد", "رؤوس", "رأس"],
+    "unit": ["unit", "uom", "measure", "unit of measure", "per", "الوحدة", "وحدة القياس", "وحدة"],
+    "unit_price": ["price", "unit price", "price per unit", "rate", "price each", "unit cost", "price/unit", "سعر", "السعر", "سعر الوحدة", "سعر الافرادي"],
+    "total_amount": ["total", "amount", "total price", "total amount", "value", "sum", "revenue", "line total", "gross", "subtotal", "الإجمالي", "الاجمالي", "المجموع", "المبلغ", "القيمة", "الإيراد"],
+    "cost": ["cost", "cost price", "unit cost", "cogs", "expense", "purchase price", "التكلفة", "الكلفة", "سعر الشراء", "المصروف"],
+    "party": ["customer", "client", "buyer", "supplier", "vendor", "party", "sold to", "purchased from", "account", "contact", "الزبون", "العميل", "المشتري", "المورد", "الجهة", "البائع"],
+    "location": ["location", "site", "farm", "field", "barn", "pen", "warehouse", "store", "الموقع", "المزرعة", "الحقل", "المخزن"],
+    "transaction_type": ["transaction", "transaction type", "tx type", "movement", "operation", "action", "الحركة", "نوع الحركة", "العملية"],
+    "weight": ["weight", "wt", "mass", "kg", "kilograms", "live weight", "carcass weight", "الوزن", "وزن"],
+    "breed": ["breed", "variety", "strain", "السلالة", "النوع الوراثي", "سلالة"],
+    "sex": ["sex", "gender", "male/female", "الجنس", "ذكر/أنثى"],
+    "age": ["age", "age months", "age years", "dob", "date of birth", "العمر", "السن", "تاريخ الميلاد"],
+    "tag_id": ["tag", "tag id", "ear tag", "id", "animal id", "ref", "reference", "code", "serial", "رقم", "الرقم", "رقم الأذن", "المرجع", "الكود"],
+    "notes": ["notes", "note", "comment", "comments", "remarks", "memo", "ملاحظات", "ملاحظة", "تعليق"]
+  },
+  "values": {
+    "livestock": ["sheep", "ewe", "ram", "lamb", "hogget", "cow", "bull", "heifer", "calf", "cattle", "goat", "doe", "buck", "kid", "hen", "rooster", "chick", "hive", "nucleus", "super", "خروف", "أغنام", "نعجة", "كبش", "حمل", "بقرة", "ثور", "عجل", "عجلة", "ماعز", "جدي", "دجاجة", "ديك", "خلية", "نحل"],
+    "products": ["milk", "cheese", "labneh", "yoghurt", "yogurt", "butter", "ghee", "honey", "honeycomb", "beeswax", "wool", "fleece", "egg", "eggs", "حليب", "لبن", "جبنة", "لبنة", "زبدة", "سمن", "عسل", "شمع", "صوف", "بيض"],
+    "units": ["head", "kg", "g", "gram", "ton", "tonne", "litre", "liter", "l", "ml", "gallon", "gal", "dozen", "hive", "bag", "bale", "jar", "pcs", "piece", "box", "lb", "lbs", "pound", "رأس", "كغ", "كيلو", "غرام", "طن", "لتر", "دزينة", "كيس", "بالة", "علبة", "حبة", "صندوق"],
+    "sale": ["sale", "sold", "sell", "revenue", "بيع", "مبيع", "مباع"],
+    "purchase": ["purchase", "bought", "buy", "شراء", "مشترى"],
+    "birth": ["birth", "born", "lambing", "kidding", "calving", "hatched", "ولادة", "مولود"],
+    "death": ["death", "died", "loss", "mortality", "نفوق", "وفاة", "موت"],
+    "expense": ["expense", "cost", "fee", "مصروف", "نفقة"],
+    "currencySymbols": { "$": "USD", "US$": "USD", "€": "EUR", "£": "GBP", "﷼": "SAR", "ر.س": "SAR", "د.إ": "AED", "JD": "JOD", "د.ا": "JOD", "EGP": "EGP", "ج.م": "EGP" }
+  }
+}
