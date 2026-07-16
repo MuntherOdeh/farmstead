@@ -1,32 +1,31 @@
 import type { Metadata } from "next";
-import { Package } from "lucide-react";
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyMedia,
-  EmptyTitle,
-} from "@/components/ui/empty";
-
 import { requireUser } from "@/lib/auth/require-user";
+import {
+  listAttributeDefs,
+  listCategories,
+  listProducts,
+  listUnits,
+} from "@/lib/products/queries";
+import { ProductsView } from "@/components/products/products-view";
 
 export const metadata: Metadata = { title: "Products" };
 
 export default async function ProductsPage() {
-  await requireUser();
+  const user = await requireUser();
+  const [products, categories, units, attributeDefs] = await Promise.all([
+    listProducts(),
+    listCategories(),
+    listUnits(),
+    listAttributeDefs(),
+  ]);
+
   return (
-    <Empty className="min-h-[60vh]">
-      <EmptyHeader>
-        <EmptyMedia variant="icon">
-          <Package />
-        </EmptyMedia>
-        <EmptyTitle>No products yet</EmptyTitle>
-        <EmptyDescription>
-          The catalogue — livestock, dairy, honey, wool and everything else,
-          with your own categories, units and custom fields. Arrives in
-          Milestone 4.
-        </EmptyDescription>
-      </EmptyHeader>
-    </Empty>
+    <ProductsView
+      initialProducts={products}
+      initialCategories={categories}
+      initialUnits={units}
+      initialAttributeDefs={attributeDefs}
+      canEdit={user.role === "admin"}
+    />
   );
 }

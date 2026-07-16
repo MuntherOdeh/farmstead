@@ -49,7 +49,15 @@
       "Bash(curl -sI http://localhost:3000/login)",
       "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" -X POST http://localhost:3000/api/auth/sign-in/username -H \"Content-Type: application/json\" -d '{\"username\":\"admin\",\"password\":\"wrong-password-123\"}')",
       "Bash(node shot-auth.mjs)",
-      "Bash(git commit --quiet -m 'feat: auth — better-auth with username/admin plugins, guarded routes, rate limiting *)"
+      "Bash(git commit --quiet -m 'feat: auth — better-auth with username/admin plugins, guarded routes, rate limiting *)",
+      "Bash(curl -s https://cdn.sheetjs.com/)",
+      "Bash(curl -sI https://cdn.sheetjs.com/xlsx-latest/xlsx-latest.tgz)",
+      "Bash(curl -s \"https://cdn.sheetjs.com/\" -o /tmp/sheetjs.html)",
+      "Read(//tmp/**)",
+      "Bash(node -e \"const x=require\\('xlsx'\\); console.log\\('xlsx', x.version\\)\")",
+      "Bash(curl -s -o /dev/null -w \"server: %{http_code}\\\\n\" http://localhost:3000/login)",
+      "Bash(node drive-products.mjs)",
+      "Bash(git commit --quiet -m 'feat: products CRUD — table, slide-over form, custom categories/units/fields, bulk ops *)"
     ]
   }
 }
