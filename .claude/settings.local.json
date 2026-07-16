@@ -37,7 +37,10 @@
       "Bash(node shot.mjs)",
       "Bash(npx kill-port *)",
       "Bash(timeout 30 bash -c 'until curl -sf http://localhost:3000 >/dev/null; do sleep 1; done')",
-      "Bash(git commit --quiet -m 'feat: shell & design system — 12 AA themes, contrast gate, app shell, demo overview *)"
+      "Bash(git commit --quiet -m 'feat: shell & design system — 12 AA themes, contrast gate, app shell, demo overview *)",
+      "Bash(docker --version)",
+      "Bash(timeout 12 npx drizzle-kit studio)",
+      "Bash(git commit --quiet -m 'feat: database — drizzle schema, migrations, driver-agnostic client, seasonal seed *)"
     ]
   }
 }
