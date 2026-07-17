@@ -15,29 +15,27 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { FinancialSummary } from "@/lib/import/financial-summary";
+import type { FinancialSummary, MoneyTable } from "@/lib/import/financial-summary";
 import { cn } from "@/lib/utils";
 
 // Dedicated rendering for the owner's Arabic financial-summary sheets — the
-// whole view is RTL because the content is Arabic.
+// whole view is RTL because the content is Arabic. Everything shown comes
+// straight from the sheet, including block titles.
 
 const n = (value: number, digits = 0) =>
   value.toLocaleString("en-GB", { maximumFractionDigits: digits, minimumFractionDigits: 0 });
 
-const BAR_COLORS = [
-  "bg-chart-1",
-  "bg-chart-2",
-  "bg-chart-3",
-  "bg-chart-4",
-  "bg-chart-5",
-];
+const BAR_COLORS = ["bg-chart-1", "bg-chart-2", "bg-chart-3", "bg-chart-4", "bg-chart-5"];
+
+function tableTotal(table: MoneyTable) {
+  return table.rows.find((row) => row.isTotal) ?? table.rows.at(-1) ?? null;
+}
 
 export function FinancialSummaryView({ summary }: { summary: FinancialSummary }) {
-  const { sections, total, expensesFootnote, sales, receipts, legend, notes } = summary;
+  const { sections, total, expensesFootnote, tables, legend, notes } = summary;
   const maxAmount = Math.max(...sections.map((s) => s.amount), 1);
+  const hasOriginals = sections.some((s) => s.original !== null) || total?.original !== null;
   const mismatched = sections.filter((s) => s.diff !== null && s.diff !== 0);
-  const salesTotal = sales.find((s) => s.label.includes("إجمالي"));
-  const salesRows = sales.filter((s) => !s.label.includes("إجمالي"));
 
   return (
     <div dir="rtl" className="flex flex-col gap-4 md:gap-6">
@@ -45,16 +43,21 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
       <div className="kpi grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent>
-            <p className="text-sm text-muted-foreground">إجمالي المصاريف</p>
+            <p className="text-sm text-muted-foreground">{total?.label ?? "إجمالي المصاريف"}</p>
             <p className="font-heading text-3xl font-semibold tracking-tight">
               ${total ? n(total.amount) : "—"}
             </p>
-            {total?.original !== null && total?.diff !== 0 ? (
+            {total && total.original !== null && total.diff !== 0 ? (
               <p className="text-sm text-muted-foreground">
-                الأصل المكتوب يدوياً: ${n(total!.original!)}{" "}
-                <span className="text-destructive">({total!.diff! > 0 ? "+" : ""}{n(total!.diff!)})</span>
+                الأصل المكتوب يدوياً: ${n(total.original)}{" "}
+                <span className="text-destructive">
+                  ({total.diff! > 0 ? "+" : ""}
+                  {n(total.diff!)})
+                </span>
               </p>
-            ) : null}
+            ) : (
+              <p className="text-sm text-muted-foreground">عبر {sections.length} أقسام</p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -63,35 +66,32 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
             <p className="font-heading text-3xl font-semibold tracking-tight">
               {total ? n(total.itemCount) : "—"}
             </p>
-            <p className="text-sm text-muted-foreground">عبر {sections.length} أقسام</p>
+            <p className="text-sm text-muted-foreground">بند مصروف</p>
           </CardContent>
         </Card>
-        {salesTotal ? (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{salesTotal.label}</p>
-              <p className="font-heading text-3xl font-semibold tracking-tight">
-                {n(salesTotal.amountLira, 2)} <span className="text-base font-normal">ليرة</span>
-              </p>
-              {salesTotal.usdEquivalent !== null ? (
-                <p className="text-sm text-muted-foreground">
-                  ما يعادله بالدولار كما ورد: {n(salesTotal.usdEquivalent, 4)}
+        {tables.slice(0, 2).map((table) => {
+          const totalRow = tableTotal(table);
+          if (!totalRow) return null;
+          return (
+            <Card key={table.title}>
+              <CardContent>
+                <p className="truncate text-sm text-muted-foreground">{table.title}</p>
+                <p className="font-heading text-3xl font-semibold tracking-tight">
+                  {n(totalRow.amount, 2)}{" "}
+                  <span className="text-base font-normal">
+                    {totalRow.currency ?? "ليرة"}
+                  </span>
                 </p>
-              ) : null}
-            </CardContent>
-          </Card>
-        ) : null}
-        {receipts.length > 0 ? (
-          <Card>
-            <CardContent>
-              <p className="text-sm text-muted-foreground">{receipts[0].label}</p>
-              <p className="font-heading text-3xl font-semibold tracking-tight">
-                {n(receipts[0].amount)}{" "}
-                <span className="text-base font-normal">{receipts[0].currency}</span>
-              </p>
-            </CardContent>
-          </Card>
-        ) : null}
+                <p className="truncate text-sm text-muted-foreground">
+                  {totalRow.label}
+                  {totalRow.usdEquivalent !== null && totalRow.usdEquivalent !== totalRow.amount
+                    ? ` · ما يعادله ($): ${n(totalRow.usdEquivalent, 4)}`
+                    : ""}
+                </p>
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {mismatched.length > 0 ? (
@@ -100,7 +100,9 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
           <p>
             {mismatched.length === 1 ? "قسم واحد لا يطابق" : `${mismatched.length} أقسام لا تطابق`}{" "}
             الإجمالي المكتوب يدوياً في الملف الأصلي:{" "}
-            {mismatched.map((s) => `${s.label} (${s.diff! > 0 ? "+" : ""}${n(s.diff!)})`).join("، ")}
+            {mismatched
+              .map((s) => `${s.label} (${s.diff! > 0 ? "+" : ""}${n(s.diff!)})`)
+              .join("، ")}
             {" — "}راجع الملاحظات أدناه.
           </p>
         </div>
@@ -123,8 +125,12 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
                 <TableHead className="text-end">المبلغ ($)</TableHead>
                 <TableHead className="text-end">النسبة</TableHead>
                 <TableHead className="text-end">عدد البنود</TableHead>
-                <TableHead className="text-end">الأصل</TableHead>
-                <TableHead className="text-end">الفرق</TableHead>
+                {hasOriginals ? (
+                  <>
+                    <TableHead className="text-end">الأصل</TableHead>
+                    <TableHead className="text-end">الفرق</TableHead>
+                  </>
+                ) : null}
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -135,7 +141,9 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
                     <div className="h-2 w-full rounded-full bg-muted">
                       <div
                         className={cn("h-full rounded-full", BAR_COLORS[index % BAR_COLORS.length])}
-                        style={{ width: `${Math.max(1, Math.round((section.amount / maxAmount) * 100))}%` }}
+                        style={{
+                          width: `${Math.max(1, Math.round((section.amount / maxAmount) * 100))}%`,
+                        }}
                       />
                     </div>
                   </TableCell>
@@ -144,21 +152,25 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
                     {section.sharePct.toFixed(1)}%
                   </TableCell>
                   <TableCell className="text-end font-mono text-xs">{n(section.itemCount)}</TableCell>
-                  <TableCell className="text-end font-mono text-xs text-muted-foreground">
-                    {section.original !== null ? n(section.original) : "—"}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    {section.diff === null ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : section.diff === 0 ? (
-                      <CircleCheck className="ms-auto size-4 text-muted-foreground" />
-                    ) : (
-                      <span className="font-mono text-xs text-destructive">
-                        {section.diff > 0 ? "+" : ""}
-                        {n(section.diff)}
-                      </span>
-                    )}
-                  </TableCell>
+                  {hasOriginals ? (
+                    <>
+                      <TableCell className="text-end font-mono text-xs text-muted-foreground">
+                        {section.original !== null ? n(section.original) : "—"}
+                      </TableCell>
+                      <TableCell className="text-end">
+                        {section.diff === null ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : section.diff === 0 ? (
+                          <CircleCheck className="ms-auto size-4 text-muted-foreground" />
+                        ) : (
+                          <span className="font-mono text-xs text-destructive">
+                            {section.diff > 0 ? "+" : ""}
+                            {n(section.diff)}
+                          </span>
+                        )}
+                      </TableCell>
+                    </>
+                  ) : null}
                 </TableRow>
               ))}
               {total ? (
@@ -168,19 +180,23 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
                   <TableCell className="text-end font-mono text-sm">{n(total.amount)}</TableCell>
                   <TableCell className="text-end font-mono text-xs">100%</TableCell>
                   <TableCell className="text-end font-mono text-xs">{n(total.itemCount)}</TableCell>
-                  <TableCell className="text-end font-mono text-xs text-muted-foreground">
-                    {total.original !== null ? n(total.original) : "—"}
-                  </TableCell>
-                  <TableCell className="text-end">
-                    {total.diff !== null && total.diff !== 0 ? (
-                      <span className="font-mono text-xs text-destructive">
-                        {total.diff > 0 ? "+" : ""}
-                        {n(total.diff)}
-                      </span>
-                    ) : (
-                      <CircleCheck className="ms-auto size-4 text-muted-foreground" />
-                    )}
-                  </TableCell>
+                  {hasOriginals ? (
+                    <>
+                      <TableCell className="text-end font-mono text-xs text-muted-foreground">
+                        {total.original !== null ? n(total.original) : "—"}
+                      </TableCell>
+                      <TableCell className="text-end">
+                        {total.diff !== null && total.diff !== 0 ? (
+                          <span className="font-mono text-xs text-destructive">
+                            {total.diff > 0 ? "+" : ""}
+                            {n(total.diff)}
+                          </span>
+                        ) : (
+                          <CircleCheck className="ms-auto size-4 text-muted-foreground" />
+                        )}
+                      </TableCell>
+                    </>
+                  ) : null}
                 </TableRow>
               ) : null}
             </TableBody>
@@ -188,83 +204,62 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        {/* Sales */}
-        {sales.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>المبيعات</CardTitle>
-              <CardDescription>المبالغ بالليرة وما يعادلها بالدولار — كما وردت في الملف</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-start">البند</TableHead>
-                    <TableHead className="text-end">المبلغ (ليرة)</TableHead>
-                    <TableHead className="text-end">ما يعادله ($)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {[...salesRows, ...(salesTotal ? [salesTotal] : [])].map((row) => (
-                    <TableRow
-                      key={row.label}
-                      className={cn(row.label.includes("إجمالي") && "border-t-2 font-semibold")}
-                    >
-                      <TableCell>{row.label}</TableCell>
-                      <TableCell className="text-end font-mono text-sm">
-                        {n(row.amountLira, 2)}
-                      </TableCell>
-                      <TableCell className="text-end font-mono text-sm">
-                        {row.usdEquivalent !== null ? n(row.usdEquivalent, 4) : "—"}
-                      </TableCell>
+      {/* Money tables — titles come from the sheet itself */}
+      {tables.length > 0 ? (
+        <div className="grid gap-4 lg:grid-cols-2">
+          {tables.map((table) => (
+            <Card key={table.title}>
+              <CardHeader>
+                <CardTitle>{table.title}</CardTitle>
+                <CardDescription>
+                  {table.hasCurrency
+                    ? "بنود بعملات مختلفة مع مقابلها بالدولار — كما وردت في الملف"
+                    : "المبالغ بالليرة وما يعادلها بالدولار — كما وردت في الملف"}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="text-start">البند</TableHead>
+                      <TableHead className="text-end">
+                        {table.hasCurrency ? "المبلغ" : "المبلغ (ليرة)"}
+                      </TableHead>
+                      {table.hasCurrency ? (
+                        <TableHead className="text-end">العملة</TableHead>
+                      ) : null}
+                      <TableHead className="text-end">ما يعادله ($)</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ) : null}
-
-        {/* Receipts & other expenses */}
-        {receipts.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>المقبوضات والمصاريف الأخرى</CardTitle>
-              <CardDescription>بنود بعملات مختلفة مع مقابلها بالدولار</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="text-start">البند</TableHead>
-                    <TableHead className="text-end">المبلغ</TableHead>
-                    <TableHead className="text-end">العملة</TableHead>
-                    <TableHead className="text-end">ما يعادله ($)</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {receipts.map((row) => (
-                    <TableRow key={row.label}>
-                      <TableCell className="max-w-52 truncate">{row.label}</TableCell>
-                      <TableCell className="text-end font-mono text-sm">{n(row.amount)}</TableCell>
-                      <TableCell className="text-end">
-                        <Badge variant="outline">{row.currency}</Badge>
-                      </TableCell>
-                      <TableCell className="text-end font-mono text-sm">
-                        {row.usdEquivalent !== null ? n(row.usdEquivalent, 2) : "—"}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        ) : null}
-      </div>
+                  </TableHeader>
+                  <TableBody>
+                    {table.rows.map((row) => (
+                      <TableRow
+                        key={row.label}
+                        className={cn(row.isTotal && "border-t-2 font-semibold")}
+                      >
+                        <TableCell className="max-w-52 truncate">{row.label}</TableCell>
+                        <TableCell className="text-end font-mono text-sm">
+                          {n(row.amount, 2)}
+                        </TableCell>
+                        {table.hasCurrency ? (
+                          <TableCell className="text-end">
+                            <Badge variant="outline">{row.currency ?? "—"}</Badge>
+                          </TableCell>
+                        ) : null}
+                        <TableCell className="text-end font-mono text-sm">
+                          {row.usdEquivalent !== null ? n(row.usdEquivalent, 4) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Notes */}
         {notes.length > 0 ? (
           <Card className="lg:col-span-2">
             <CardHeader>
@@ -285,7 +280,6 @@ export function FinancialSummaryView({ summary }: { summary: FinancialSummary })
           </Card>
         ) : null}
 
-        {/* Colour legend */}
         {legend.length > 0 ? (
           <Card>
             <CardHeader>

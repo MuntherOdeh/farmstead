@@ -1,39 +1,42 @@
 // Structure-aware reader for the owner's Arabic financial-summary sheets
-// (Balance_sheet_trial.xlsx — "ملخص"). The sheet stacks several tables in one
-// grid: expenses by section, a sales block, receipts/other expenses, a colour
-// legend, and numbered notes. When an import's raw rows match this shape the
-// /data page renders a dedicated financial view instead of generic widgets.
+// ("ملخص" in Balance_sheet_trial.xlsx / Trial 2.xlsx). The sheet stacks
+// several tables in one grid: expenses by section, then any number of money
+// tables (sales in lira, invested amounts, receipts…) each introduced by a
+// title line and a "البند" sub-header, plus an optional colour legend and
+// numbered notes. Titles are read from the sheet itself, so renamed or added
+// blocks keep working.
 
 export interface ExpenseSection {
   label: string;
   amount: number;
   sharePct: number; // 0–100
   itemCount: number;
-  /** The hand-written total from the original file, when present. */
+  /** Hand-written total from the original file, when that column exists. */
   original: number | null;
   /** amount − original; non-zero means the file disagrees with itself. */
   diff: number | null;
 }
 
-export interface SalesRow {
-  label: string;
-  amountLira: number;
-  usdEquivalent: number | null;
-}
-
-export interface ReceiptRow {
+export interface MoneyRow {
   label: string;
   amount: number;
-  currency: string;
+  /** Currency text when the table has a العملة column (e.g. "$", "ليرة"). */
+  currency: string | null;
   usdEquivalent: number | null;
+  isTotal: boolean;
+}
+
+export interface MoneyTable {
+  title: string;
+  hasCurrency: boolean;
+  rows: MoneyRow[];
 }
 
 export interface FinancialSummary {
   sections: ExpenseSection[];
   total: ExpenseSection | null;
   expensesFootnote: string | null;
-  sales: SalesRow[];
-  receipts: ReceiptRow[];
+  tables: MoneyTable[];
   legend: string[];
   notes: string[];
 }
@@ -51,8 +54,11 @@ const num = (value: unknown): number | null =>
 const text = (value: unknown): string | null =>
   typeof value === "string" && value.trim() !== "" ? value.trim() : null;
 
-/** "٢. المبيعات" style block headings (Arabic-Indic or Western numerals). */
-const isNumberedHeading = (value: string) => /^[٠-٩0-9]+\s*[.،]/.test(value);
+/** Strip a leading "٢." / "3-" style numbering from a block title. */
+const cleanTitle = (value: string) =>
+  value.replace(/^[٠-٩0-9]+\s*[.،-]\s*/, "").trim();
+
+const isTotalLabel = (value: string) => /إجمالي|الإجمالي|المجموع/.test(value);
 
 export function parseFinancialSummary(rawRows: RawRow[]): FinancialSummary | null {
   if (rawRows.length === 0) return null;
@@ -65,14 +71,15 @@ export function parseFinancialSummary(rawRows: RawRow[]): FinancialSummary | nul
     sections: [],
     total: null,
     expensesFootnote: null,
-    sales: [],
-    receipts: [],
+    tables: [],
     legend: [],
     notes: [],
   };
 
-  type Block = "expenses" | "sales" | "receipts" | "legend" | "notes";
+  type Block = "expenses" | "table" | "legend" | "notes";
   let block: Block = "expenses";
+  let currentTable: MoneyTable | null = null;
+  let pendingTitle: string | null = null;
 
   for (const row of rawRows) {
     const label = text(row[KEY_SECTION]);
@@ -81,36 +88,50 @@ export function parseFinancialSummary(rawRows: RawRow[]): FinancialSummary | nul
     const count = num(row[KEY_COUNT]);
     const original = num(row[KEY_ORIGINAL]);
 
-    // Note rows repeat the same long text across every column.
+    // Note rows repeat one long text across every column — collapse to one.
     const values = [row[KEY_SECTION], row[KEY_AMOUNT], row[KEY_SHARE], row[KEY_COUNT]];
     const distinctTexts = new Set(values.filter((v) => typeof v === "string"));
-    if (
-      block === "notes" &&
-      label !== null &&
-      distinctTexts.size === 1 &&
-      values.every((v) => typeof v === "string" || v === null || v === undefined)
-    ) {
+    const allTextual = values.every(
+      (v) => typeof v === "string" || v === null || v === undefined,
+    );
+    if (block === "notes" && label !== null && distinctTexts.size === 1 && allTextual) {
       summary.notes.push(label);
       continue;
     }
 
     if (label === null) continue;
 
-    // Block transitions.
-    if (label.includes("المبيعات") && isNumberedHeading(label)) {
-      block = "sales";
+    // "البند" sub-header opens a money table; العملة column decides its shape.
+    if (label === "البند") {
+      currentTable = {
+        title: pendingTitle ?? "جدول مالي",
+        hasCurrency: text(row[KEY_COUNT]) === "العملة",
+        rows: [],
+      };
+      summary.tables.push(currentTable);
+      pendingTitle = null;
+      block = "table";
       continue;
     }
-    if (label.includes("المقبوضات") && isNumberedHeading(label)) {
-      block = "receipts";
-      continue;
-    }
-    if (label.includes("دليل الألوان")) {
-      block = "legend";
-      continue;
-    }
-    if (label.includes("ملاحظات")) {
-      block = "notes";
+
+    // Text-only line (all numeric columns empty).
+    if (amount === null && share === null && count === null) {
+      // Keyword blocks — only short heading-like lines switch blocks, so a
+      // long footnote that merely MENTIONS "الملاحظات" doesn't hijack parsing.
+      if (label.length <= 40 && label.includes("دليل الألوان")) {
+        block = "legend";
+      } else if (label.length <= 40 && label.includes("ملاحظات")) {
+        block = "notes";
+      } else if (block === "legend") {
+        summary.legend.push(label);
+      } else if (block === "notes") {
+        summary.notes.push(label);
+      } else if (label.length <= 60) {
+        // Short line → the title of whatever table comes next.
+        pendingTitle = cleanTitle(label);
+      } else if (block === "expenses" && summary.total !== null) {
+        summary.expensesFootnote = label;
+      }
       continue;
     }
 
@@ -125,40 +146,24 @@ export function parseFinancialSummary(rawRows: RawRow[]): FinancialSummary | nul
             original,
             diff: original !== null ? amount - original : null,
           };
-          if (label.includes("إجمالي")) summary.total = section;
+          if (isTotalLabel(label)) summary.total = section;
           else summary.sections.push(section);
-        } else if (amount === null && share === null && summary.total !== null) {
-          // Footnote line directly under the expenses table.
-          summary.expensesFootnote = label;
         }
         break;
       }
-      case "sales": {
-        if (label === "البند") break; // sub-table header
-        if (amount !== null) {
-          summary.sales.push({ label, amountLira: amount, usdEquivalent: share });
-        }
-        break;
-      }
-      case "receipts": {
-        if (label === "البند") break;
-        if (amount !== null) {
-          summary.receipts.push({
+      case "table": {
+        if (currentTable && amount !== null) {
+          currentTable.rows.push({
             label,
             amount,
-            currency: text(row[KEY_COUNT]) ?? "$",
+            currency: currentTable.hasCurrency ? text(row[KEY_COUNT]) : null,
             usdEquivalent: share,
+            isTotal: isTotalLabel(label),
           });
         }
         break;
       }
-      case "legend": {
-        summary.legend.push(label);
-        break;
-      }
-      case "notes":
-        // handled above (repeated-text rows); stray labels are notes too
-        summary.notes.push(label);
+      default:
         break;
     }
   }

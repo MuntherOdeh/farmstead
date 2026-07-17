@@ -7,7 +7,8 @@ import { join } from "node:path";
 
 function adminPassword(): string {
   const env = readFileSync(join(process.cwd(), ".env.local"), "utf8");
-  const match = env.match(/^ADMIN_PASSWORD=(.+)$/m);
+  // `vercel env pull` rewrites .env.local with quoted values — strip them.
+  const match = env.match(/^ADMIN_PASSWORD="?([^"\r\n]+)"?$/m);
   if (!match) throw new Error("ADMIN_PASSWORD missing from .env.local");
   return match[1].trim();
 }
@@ -22,12 +23,24 @@ test("login → import messy sample → dashboard renders", async ({ page }) => 
 
   // ── Upload the messy sample ──
   await page.goto("/import");
-  await page
-    .locator("input[type=file]")
-    .setInputFiles(join(process.cwd(), "public", "samples", "farmstead-sample-messy.xlsx"));
+  await page.waitForLoadState("networkidle");
+  // The change handler attaches on hydration — retry the file drop until the
+  // sheet picker responds so a lost pre-hydration event can't hang the test.
+  const samplePath = join(process.cwd(), "public", "samples", "farmstead-sample-messy.xlsx");
+  const sheetButton = page.getByRole("button", { name: "H1 Sales" });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    await page.locator("input[type=file]").setInputFiles(samplePath);
+    try {
+      await sheetButton.waitFor({ state: "visible", timeout: 15_000 });
+      break;
+    } catch {
+      // change event lost pre-hydration — drop the file again
+    }
+  }
+  await expect(sheetButton).toBeVisible();
 
-  // Multiple sheets → the picker appears; choose the English one.
-  await page.getByRole("button", { name: "H1 Sales" }).click();
+  // Multiple sheets → the picker appeared; choose the English one.
+  await sheetButton.click();
 
   // ── Review: columns detected, quality panel shows the planted anomalies ──
   await expect(page.getByText("Column mapping")).toBeVisible({ timeout: 30_000 });
