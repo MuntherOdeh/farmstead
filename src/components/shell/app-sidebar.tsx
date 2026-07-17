@@ -15,13 +15,17 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { usePreferences } from "@/components/theme/theme-provider";
 import { NAV_ITEMS } from "@/lib/nav";
 
 export function AppSidebar() {
   const pathname = usePathname();
+  // The sidebar positions itself with physical classes, so RTL needs an
+  // explicit side switch.
+  const { direction } = usePreferences();
 
   return (
-    <Sidebar collapsible="icon">
+    <Sidebar collapsible="icon" side={direction === "rtl" ? "right" : "left"}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

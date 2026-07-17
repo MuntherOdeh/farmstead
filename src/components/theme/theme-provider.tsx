@@ -24,6 +24,10 @@ export const DENSITIES = ["comfortable", "compact"] as const;
 export type Density = (typeof DENSITIES)[number];
 const DENSITY_STORAGE_KEY = "farmstead-density";
 
+export const DIRECTIONS = ["ltr", "rtl"] as const;
+export type Direction = (typeof DIRECTIONS)[number];
+const DIRECTION_STORAGE_KEY = "farmstead-dir";
+
 /**
  * localStorage-backed preference exposed as an external store, so components
  * read it via useSyncExternalStore: the server snapshot is the default, the
@@ -99,11 +103,24 @@ const densityStore = createPreferenceStore<Density>(
   },
 );
 
+// The whole app uses logical properties (ps-/pe-/ms-/me-), so flipping `dir`
+// on <html> is enough to go RTL (SPEC §10).
+const directionStore = createPreferenceStore<Direction>(
+  DIRECTION_STORAGE_KEY,
+  DIRECTIONS,
+  "ltr",
+  (value) => {
+    document.documentElement.dir = value;
+  },
+);
+
 interface PreferencesContextValue {
   preset: ThemePreset;
   setPreset: (preset: ThemePreset) => void;
   density: Density;
   setDensity: (density: Density) => void;
+  direction: Direction;
+  setDirection: (direction: Direction) => void;
 }
 
 const PreferencesContext = createContext<PreferencesContextValue | null>(null);
@@ -127,9 +144,15 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     densityStore.getSnapshot,
     densityStore.getServerSnapshot,
   );
+  const direction = useSyncExternalStore(
+    directionStore.subscribe,
+    directionStore.getSnapshot,
+    directionStore.getServerSnapshot,
+  );
 
   const setPreset = useCallback((next: ThemePreset) => presetStore.set(next), []);
   const setDensity = useCallback((next: Density) => densityStore.set(next), []);
+  const setDirection = useCallback((next: Direction) => directionStore.set(next), []);
 
   return (
     <NextThemesProvider
@@ -138,7 +161,9 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
       enableSystem
       disableTransitionOnChange
     >
-      <PreferencesContext.Provider value={{ preset, setPreset, density, setDensity }}>
+      <PreferencesContext.Provider
+        value={{ preset, setPreset, density, setDensity, direction, setDirection }}
+      >
         {children}
       </PreferencesContext.Provider>
     </NextThemesProvider>

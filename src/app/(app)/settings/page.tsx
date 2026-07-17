@@ -4,6 +4,7 @@ import { getDb, schema } from "@/db";
 import { requireUser } from "@/lib/auth/require-user";
 import { AccountSettings } from "@/components/settings/account-settings";
 import { AppearanceSettings } from "@/components/settings/appearance-settings";
+import { DemoDataSettings } from "@/components/settings/demo-data-settings";
 import { UsersSettings, type UserRow } from "@/components/settings/users-settings";
 import { Separator } from "@/components/ui/separator";
 
@@ -54,6 +55,11 @@ export default async function SettingsPage() {
           <section className="flex flex-col gap-4">
             <h2 className="font-heading text-lg font-medium">Access</h2>
             <UsersSettings users={users} currentUserId={user.id} />
+          </section>
+          <Separator />
+          <section className="flex flex-col gap-4">
+            <h2 className="font-heading text-lg font-medium">Data</h2>
+            <DemoDataSettings />
           </section>
         </>
       ) : null}

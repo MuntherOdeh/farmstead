@@ -5,9 +5,20 @@ import { cn } from "@/lib/utils";
 import { AppThemeProvider } from "@/components/theme/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
-const fraunces = Fraunces({ subsets: ["latin"], variable: "--font-display" });
-const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-geist-mono" });
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
+// axes: [] keeps only the weight axis — the full Fraunces variable font with
+// optical size/softness/wonk axes is ~3x larger and hurts LCP on headlines.
+const fraunces = Fraunces({
+  subsets: ["latin"],
+  variable: "--font-display",
+  display: "swap",
+  axes: [],
+});
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+  variable: "--font-geist-mono",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: { default: "Farmstead", template: "%s · Farmstead" },
@@ -18,7 +29,7 @@ export const metadata: Metadata = {
 // Applies stored preset/density to <html> before first paint, so a saved
 // theme never flashes the default. next-themes injects its own equivalent
 // for the light/dark class.
-const preferencesScript = `(function(){try{var t=localStorage.getItem("farmstead-preset");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t);var d=localStorage.getItem("farmstead-density");if(d)document.documentElement.setAttribute("data-density",d)}catch(e){}})()`;
+const preferencesScript = `(function(){try{var t=localStorage.getItem("farmstead-preset");if(t&&t!=="default")document.documentElement.setAttribute("data-theme",t);var d=localStorage.getItem("farmstead-density");if(d)document.documentElement.setAttribute("data-density",d);var r=localStorage.getItem("farmstead-dir");if(r==="rtl")document.documentElement.setAttribute("dir","rtl")}catch(e){}})()`;
 
 export default function RootLayout({
   children,

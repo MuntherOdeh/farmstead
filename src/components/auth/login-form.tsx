@@ -1,11 +1,9 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -19,19 +17,18 @@ import { Input } from "@/components/ui/input";
 import { InputGroup, InputGroupAddon, InputGroupInput } from "@/components/ui/input-group";
 import { authClient } from "@/lib/auth/client";
 
-const loginSchema = z.object({
-  username: z.string().min(1, "Enter your username"),
-  password: z.string().min(1, "Enter your password"),
-});
-
-type LoginValues = z.infer<typeof loginSchema>;
+// Two required strings — plain RHF rules keep zod out of the login chunk
+// (it matters for first-load performance on slow connections).
+interface LoginValues {
+  username: string;
+  password: string;
+}
 
 export function LoginForm() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
 
   const form = useForm<LoginValues>({
-    resolver: zodResolver(loginSchema),
     defaultValues: { username: "", password: "" },
   });
 
@@ -62,6 +59,7 @@ export function LoginForm() {
         <FormField
           control={form.control}
           name="username"
+          rules={{ required: "Enter your username" }}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Username</FormLabel>
@@ -81,16 +79,18 @@ export function LoginForm() {
         <FormField
           control={form.control}
           name="password"
+          rules={{ required: "Enter your password" }}
           render={({ field }) => (
             <FormItem>
               <FormLabel>Password</FormLabel>
-              <FormControl>
                 <InputGroup>
-                  <InputGroupInput
-                    type={showPassword ? "text" : "password"}
-                    autoComplete="current-password"
-                    {...field}
-                  />
+                  <FormControl>
+                    <InputGroupInput
+                      type={showPassword ? "text" : "password"}
+                      autoComplete="current-password"
+                      {...field}
+                    />
+                  </FormControl>
                   <InputGroupAddon align="inline-end">
                     <Button
                       type="button"
@@ -103,7 +103,6 @@ export function LoginForm() {
                     </Button>
                   </InputGroupAddon>
                 </InputGroup>
-              </FormControl>
               <FormMessage />
             </FormItem>
           )}

@@ -8,9 +8,11 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 import {
   DENSITIES,
+  DIRECTIONS,
   THEME_PRESETS,
   usePreferences,
   type Density,
+  type Direction,
   type ThemePreset,
 } from "@/components/theme/theme-provider";
 
@@ -68,7 +70,7 @@ const emptySubscribe = () => () => {};
 
 export function AppearanceSettings() {
   const { theme, setTheme } = useTheme();
-  const { preset, setPreset, density, setDensity } = usePreferences();
+  const { preset, setPreset, density, setDensity, direction, setDirection } = usePreferences();
   // useTheme() is undefined during SSR; only trust it after hydration so the
   // selected state never flashes wrong.
   const mounted = useSyncExternalStore(
@@ -138,6 +140,29 @@ export function AppearanceSettings() {
         >
           {DENSITIES.map((d) => (
             <ToggleGroupItem key={d} value={d} className="px-4 capitalize">
+              {d}
+            </ToggleGroupItem>
+          ))}
+        </ToggleGroup>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <Label className="text-base">Direction</Label>
+        <p className="text-sm text-muted-foreground">
+          The layout is built with logical properties, so right-to-left flips
+          the whole interface.
+        </p>
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          value={direction}
+          onValueChange={(value) => {
+            if (value) setDirection(value as Direction);
+          }}
+          className="w-fit"
+        >
+          {DIRECTIONS.map((d) => (
+            <ToggleGroupItem key={d} value={d} className="px-4 uppercase">
               {d}
             </ToggleGroupItem>
           ))}

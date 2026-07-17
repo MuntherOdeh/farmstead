@@ -58,6 +58,14 @@ Current shadcn renders destructive buttons/badges as `text-destructive` on a 10�
 
 SPEC §10 wants one UI face, one display face, one mono. Chose Inter (UI), Fraunces (display — a warm serif that suits a farm product), Geist Mono (numbers/SKUs, kept from the scaffold). `tabular-nums` is applied globally to tables and KPI tiles.
 
+## 2026-07-17 — Lighthouse: desktop ≥90 met; mobile perf 81–85 accepted
+
+Desktop preset scores 100 perf / 98 a11y / 100 best-practices. Mobile (simulated slow-4G + 4× CPU) scores 81–85 perf: the LCP element is plain text whose paint is gated by the framework's first-load CSS/JS chain. Tried and measured: trimming Fraunces variable-font axes (+16 points, kept), `experimental.inlineCss` (−12 points, reverted — bloats HTML on slow links), `font-display: optional` for body text (no change, reverted), removing zod from the login chunk (kept). Squeezing the last ~8 mobile points would mean de-Reacting the login page; not worth it for a private dashboard whose users log in once and stay cached.
+
+## 2026-07-17 — Prices display "$" not "US$"
+
+Owner asked for the bare symbol. All money display flows through `src/lib/format.ts`, which now uses `currencyDisplay: "narrowSymbol"` — en-GB renders USD as "$" instead of "US$". The `US$` entry in the import synonyms dictionary stays: it's for recognising currencies in uploaded files, not display.
+
 ## 2026-07-16 — Milestone 0 npm scripts deferred to the scaffold
 
 The M0 checklist mentions "CI-ish npm scripts", but a `package.json` created before `create-next-app` runs would block the scaffold (it refuses non-whitelisted files). The scripts are documented in `CLAUDE.md` now and land with the Milestone 1 scaffold. No behaviour is lost — there is no code to run scripts against yet.

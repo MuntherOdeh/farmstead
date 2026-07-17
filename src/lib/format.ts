@@ -5,15 +5,18 @@
 const LOCALE = "en-GB";
 const CURRENCY = "USD";
 
+// narrowSymbol renders "$1,234" instead of en-GB's default "US$1,234".
 const money = new Intl.NumberFormat(LOCALE, {
   style: "currency",
   currency: CURRENCY,
+  currencyDisplay: "narrowSymbol",
   maximumFractionDigits: 0,
 });
 
 const moneyExact = new Intl.NumberFormat(LOCALE, {
   style: "currency",
   currency: CURRENCY,
+  currencyDisplay: "narrowSymbol",
   minimumFractionDigits: 2,
   maximumFractionDigits: 2,
 });
@@ -21,6 +24,7 @@ const moneyExact = new Intl.NumberFormat(LOCALE, {
 const moneyCompact = new Intl.NumberFormat(LOCALE, {
   style: "currency",
   currency: CURRENCY,
+  currencyDisplay: "narrowSymbol",
   notation: "compact",
   maximumFractionDigits: 1,
 });
