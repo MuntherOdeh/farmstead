@@ -88,7 +88,8 @@ vercel --prod
 Then actually use the deployed app: log in, upload
 `public/samples/farmstead-sample-messy.xlsx`, and check a chart renders.
 
-**Live URL:** _not deployed yet — add it here after the first `vercel --prod`._
+**Live URL:** https://farmstead-weld.vercel.app
+(project `farmstead`, GitHub repo `MuntherOdeh/farmstead` — pushes to `main` auto-deploy)
 
 ### The Hobby-plan note (read this)
 

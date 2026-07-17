@@ -70,7 +70,11 @@ Owner asked for the bare symbol. All money display flows through `src/lib/format
 
 `npm audit` reports two advisory chains, both moderate and both confined to build tooling: (1) esbuild ≤0.24.2 via drizzle-kit's bundled `@esbuild-kit` — the advisory concerns esbuild's *dev server* accepting cross-origin requests; drizzle-kit never runs that server here. (2) postcss <8.5.10 pinned *inside* next itself — it processes our own CSS at build time, never untrusted input, and npm's "fix" would downgrade next to v9. Next 16.2.10 is the current stable and well past the 2025 React2Shell fixes the spec calls out. Nothing ships to the runtime bundle from either chain. Revisit on dependency bumps.
 
-## 2026-07-17 — Milestone 9 deploy blocked on owner credentials
+## 2026-07-17 — Deployed: farmstead-weld.vercel.app
+
+Owner authorised the deploy. `farmstead.vercel.app` was already taken globally, so production lives on the assigned alias **farmstead-weld.vercel.app** (`BETTER_AUTH_URL` points there). Neon was installed through `vercel integration add neon` after the owner's one-time browser terms acceptance — no dashboard clicking needed beyond that. Two field notes: `vercel env pull`/link rewrites `.env.local` with QUOTED values (scripts that regex the file must strip quotes), and the production login verification tripped our own rate limiter at exactly 5 attempts — evidence it works; cleared via the `rate_limit` table.
+
+## 2026-07-17 — Milestone 9 deploy blocked on owner credentials (superseded above)
 
 Everything ship-shaped except the deploy itself, which needs the owner's accounts: a GitHub personal repo (Hobby can't link org repos), `vercel login`, and the Neon Marketplace database. The README carries the exact command sequence; the app runs locally against PGlite in the meantime. When `DATABASE_URL` exists, `db:migrate` + `db:seed` against Neon and `vercel --prod` are the only remaining steps.
 
