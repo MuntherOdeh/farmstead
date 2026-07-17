@@ -13,7 +13,13 @@ import {
 import { formatMoneyCompact } from "@/lib/format";
 import type { CategorySlice } from "@/lib/demo/overview";
 
-export function CategoryDonut({ data }: { data: CategorySlice[] }) {
+export function CategoryDonut({
+  data,
+  caption = "last 12 months",
+}: {
+  data: CategorySlice[];
+  caption?: string;
+}) {
   // Config is derived from the data so real category names label correctly.
   const config = useMemo(() => {
     const derived: ChartConfig = { revenue: { label: "Revenue" } };
@@ -64,7 +70,7 @@ export function CategoryDonut({ data }: { data: CategorySlice[] }) {
                       y={(viewBox.cy ?? 0) + 16}
                       className="fill-muted-foreground text-xs"
                     >
-                      12 months
+                      {caption}
                     </tspan>
                   </text>
                 );

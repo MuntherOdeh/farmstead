@@ -17,11 +17,26 @@ const asMoney = (value: string | null) =>
 // owner's ledgers land with sensible kinds. Anything unknown becomes "other".
 const ARABIC_KINDS: Array<[RegExp, "livestock" | "dairy" | "apiary" | "crop" | "input" | "equipment" | "other"]> = [
   [/نحل|عسل/, "apiary"],
-  [/غنم|خروف|أغنام|ماعز|بقر|عجل|دواجن|دجاج/, "livestock"],
+  [/غنم|خروف|أغنام|ماعز|عنزة|جدي|بقر|عجل|دواجن|دجاج/, "livestock"],
   [/حليب|جبنة|لبن|ألبان|قريشة|سمنة/, "dairy"],
   [/زراعة|محصول|زيتون|قمح/, "crop"],
   [/وقود|أعلاف|علف|بناء|سماد/, "input"],
   [/معدات|آليات|أدوات/, "equipment"],
+];
+
+// When a sheet has no قسم column (e.g. sales), infer the category from the
+// item name itself — غنم عدد 6 is sheep, جبنة is dairy.
+// Short tokens (جدي) need explicit space/edge boundaries — Arabic letters
+// defeat \b, and جدي otherwise matches inside الجديدة.
+const NAME_CATEGORY: Array<[RegExp, string]> = [
+  [/أرض|ارض/, "أرض"],
+  [/غنم|خروف|نعجة|كبش|دبيحة/, "غنم"],
+  [/ماعز|عنزة|سخل|(^|\s)جدي(\s|$)/, "ماعز"],
+  [/عجل|بقرة|بقر|ثور/, "بقر"],
+  [/جبنة|قريشة|سمنة|حليب|حلييب|لبنة|زبدة|(^|\s)لبن(\s|$)/, "ألبان"],
+  [/عسل|شمع/, "نحل"],
+  [/بيض/, "بيض"],
+  [/صوف/, "صوف"],
 ];
 
 /** Slug that stays unique for non-Latin names (plain slugify strips Arabic). */
@@ -167,7 +182,10 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
       if (match.action === "map" && match.productId) {
         productIdByName.set(key, match.productId);
       } else if (match.action === "create") {
-        const sectionName = categoryNameByProduct.get(key);
+        const sectionName =
+          categoryNameByProduct.get(key) ??
+          NAME_CATEGORY.find(([re]) => re.test(match.name))?.[1] ??
+          null;
         const categoryId =
           match.categoryId ??
           (sectionName ? await resolveCategory(sectionName) : otherCategory);

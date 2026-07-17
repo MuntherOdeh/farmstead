@@ -20,25 +20,19 @@ import {
 } from "@/components/ui/empty";
 import { AlertsStrip } from "@/components/dashboard/alerts-card";
 import { CategoryDonut } from "@/components/dashboard/category-donut";
+import { ComparisonChart } from "@/components/dashboard/comparison-chart";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { RecentTransactions } from "@/components/dashboard/recent-transactions";
 import { RevenueChart } from "@/components/dashboard/revenue-chart";
-import { TopProducts } from "@/components/dashboard/top-products";
+import { TopProducts, type RankedItem } from "@/components/dashboard/top-products";
 import type {
   AlertFixture,
   CategorySlice,
   MonthPoint,
   RecentTransaction,
-  TopProduct,
   TransactionType,
 } from "@/lib/demo/overview";
-import {
-  monthOf,
-  monthlyTrend,
-  profitBy,
-  profitSummary,
-  stockValuation,
-} from "@/lib/analytics/calc";
+import { monthOf, monthlyTrend, profitBy, profitSummary, stockValuation } from "@/lib/analytics/calc";
 import { loadLedger, loadProductSnapshots } from "@/lib/analytics/queries";
 import { formatMoney } from "@/lib/format";
 import { requireUser } from "@/lib/auth/require-user";
@@ -58,8 +52,8 @@ export default async function OverviewPage() {
           <EmptyTitle>The farm is empty</EmptyTitle>
           <EmptyDescription>
             Import your spreadsheets and this page fills itself with revenue,
-            margins, categories and alerts — or load the demo data from
-            Settings to see it working.
+            costs, categories and alerts — or load the demo data from Settings
+            to see it working.
           </EmptyDescription>
         </EmptyHeader>
         <EmptyContent className="flex-row justify-center gap-2">
@@ -77,61 +71,94 @@ export default async function OverviewPage() {
   }
 
   const now = new Date();
-  const thisMonth = format(now, "yyyy-MM");
-  const lastMonth = format(subMonths(now, 1), "yyyy-MM");
+  const months = [...new Set(ledger.map((row) => monthOf(row.occurredOn)))].sort();
+  const hasTimeline = months.length >= 3;
   const trailing12Start = format(subMonths(now, 12), "yyyy-MM-dd");
+  const windowRows = hasTimeline
+    ? ledger.filter((row) => row.occurredOn >= trailing12Start)
+    : ledger;
+  const windowLabel = hasTimeline ? "last 12 months" : "all recorded";
 
-  // ── KPIs ──
-  const monthRows = ledger.filter((row) => monthOf(row.occurredOn) === thisMonth);
-  const prevRows = ledger.filter((row) => monthOf(row.occurredOn) === lastMonth);
-  const monthSummary = profitSummary(monthRows);
-  const prevSummary = profitSummary(prevRows);
-  const revenueDelta = prevSummary.revenue.isZero()
-    ? 0
-    : Number(
-        monthSummary.revenue
-          .minus(prevSummary.revenue)
-          .div(prevSummary.revenue)
-          .mul(100)
-          .toFixed(1),
-      );
-  const marginDeltaPts =
-    monthSummary.marginPct && prevSummary.marginPct
-      ? Number(monthSummary.marginPct.minus(prevSummary.marginPct).toFixed(1))
-      : 0;
+  const summary = profitSummary(windowRows);
+  const purchases = windowRows
+    .filter((row) => row.type === "purchase")
+    .reduce((sum, row) => sum.plus(row.total ?? 0), new Decimal(0));
+  const totalCosts = summary.expenses.plus(purchases);
+  const net = summary.revenue.minus(totalCosts);
+  const unpaid = windowRows
+    .filter((row) => row.type === "sale" && row.notes?.includes("غير مدفوع"))
+    .reduce((sum, row) => sum.plus(row.total ?? 0), new Decimal(0));
+  const hasCogs = summary.cogs.gt(0);
   const headCount = products
     .filter((product) => product.unitCode === "head")
     .reduce((sum, product) => sum.plus(product.stockQty), new Decimal(0));
   const stockValue = stockValuation(products);
 
-  const kpis = [
+  // Month-over-month deltas only when a real prior month exists.
+  const thisMonth = format(now, "yyyy-MM");
+  const lastMonth = format(subMonths(now, 1), "yyyy-MM");
+  const prevSummary = profitSummary(ledger.filter((row) => monthOf(row.occurredOn) === lastMonth));
+  const monthSummary = profitSummary(ledger.filter((row) => monthOf(row.occurredOn) === thisMonth));
+  const revenueDelta = prevSummary.revenue.gt(0)
+    ? Number(
+        monthSummary.revenue.minus(prevSummary.revenue).div(prevSummary.revenue).mul(100).toFixed(1),
+      )
+    : null;
+
+  const kpis: {
+    label: string;
+    value: string;
+    delta?: number;
+    deltaLabel?: string | null;
+    caption?: string;
+    tone?: "default" | "negative";
+  }[] = [
     {
-      label: `Revenue · ${format(now, "MMMM")}`,
-      value: formatMoney(Number(monthSummary.revenue.toFixed(0))),
-      delta: revenueDelta,
-      deltaLabel: `vs ${format(subMonths(now, 1), "MMM")}`,
+      label: "Revenue",
+      value: formatMoney(Number(summary.revenue.toFixed(0))),
+      ...(revenueDelta !== null
+        ? { delta: revenueDelta, deltaLabel: `vs ${format(subMonths(now, 1), "MMM")}` }
+        : { caption: windowLabel }),
     },
     {
-      label: "Gross margin",
-      value: monthSummary.marginPct ? `${monthSummary.marginPct.toFixed(1)}%` : "—",
-      delta: marginDeltaPts,
-      deltaLabel: "pts vs last month",
+      label: "Costs",
+      value: formatMoney(Number(totalCosts.toFixed(0))),
+      caption: `expenses ${formatMoney(Number(summary.expenses.toFixed(0)))} · purchases ${formatMoney(Number(purchases.toFixed(0)))}`,
     },
     {
-      label: "Head count",
-      value: headCount.toFixed(0),
-      delta: 0,
-      deltaLabel: "livestock on hand",
-    },
-    {
-      label: "Stock value",
-      value: formatMoney(Number(stockValue.toFixed(0))),
-      delta: 0,
-      deltaLabel: "at cost",
+      label: "Net position",
+      value: formatMoney(Number(net.toFixed(0))),
+      caption: "revenue − all costs",
+      tone: net.isNegative() ? "negative" : "default",
     },
   ];
+  if (unpaid.gt(0)) {
+    kpis.push({
+      label: "Unpaid sales",
+      value: formatMoney(Number(unpaid.toFixed(0))),
+      caption: "marked غير مدفوع",
+    });
+  } else if (hasCogs && summary.marginPct) {
+    kpis.push({
+      label: "Gross margin",
+      value: `${summary.marginPct.toFixed(1)}%`,
+      caption: "sales minus cost of goods",
+    });
+  } else if (headCount.gt(0)) {
+    kpis.push({
+      label: "Head count",
+      value: headCount.toFixed(0),
+      caption: "livestock on hand",
+    });
+  } else {
+    kpis.push({
+      label: "Stock value",
+      value: formatMoney(Number(stockValue.toFixed(0))),
+      caption: "at cost",
+    });
+  }
 
-  // ── Revenue & costs series (18 months) ──
+  // ── Charts ──
   const revenueTrend = monthlyTrend(ledger, (row) =>
     row.type === "sale" ? new Decimal(row.total ?? 0) : null,
   );
@@ -145,19 +172,41 @@ export default async function OverviewPage() {
     costs: Number((costByMonth.get(point.month) ?? new Decimal(0)).toFixed(0)),
   }));
 
-  // ── Mix + top products (trailing 12 months) ──
-  const trailingRows = ledger.filter((row) => row.occurredOn >= trailing12Start);
-  const byCategory = profitBy(trailingRows, (row) => ({
+  const comparisonData = [
+    { label: "Revenue", value: Number(summary.revenue.toFixed(0)), colorVar: "var(--chart-1)" },
+    { label: "Expenses", value: Number(summary.expenses.toFixed(0)), colorVar: "var(--chart-4)" },
+    { label: "Purchases", value: Number(purchases.toFixed(0)), colorVar: "var(--chart-3)" },
+  ].filter((bar) => bar.value > 0);
+
+  // ── Category mixes ──
+  const revenueMix: CategorySlice[] = profitBy(windowRows, (row) => ({
     key: row.categorySlug,
     label: row.categoryName,
-  }));
-  const PALETTE_KEYS = ["sheep", "dairy", "cattle", "honey", "wool"];
-  const categoryMix: CategorySlice[] = byCategory.slice(0, 5).map((entry, index) => ({
-    key: PALETTE_KEYS[index],
-    label: entry.label,
-    revenue: Number(entry.revenue.toFixed(0)),
-  }));
-  const topProducts: TopProduct[] = profitBy(trailingRows, (row) => ({
+  }))
+    .slice(0, 5)
+    .map((entry, index) => ({
+      key: `rev-${index}`,
+      label: entry.label,
+      revenue: Number(entry.revenue.toFixed(0)),
+    }));
+
+  const costGroups = new Map<string, Decimal>();
+  for (const row of windowRows) {
+    if (row.type !== "expense" && row.type !== "purchase") continue;
+    const key = row.categoryName;
+    costGroups.set(key, (costGroups.get(key) ?? new Decimal(0)).plus(row.total ?? 0));
+  }
+  const costMix: CategorySlice[] = [...costGroups.entries()]
+    .sort((a, b) => b[1].minus(a[1]).toNumber())
+    .slice(0, 5)
+    .map(([label, value], index) => ({
+      key: `cost-${index}`,
+      label,
+      revenue: Number(value.toFixed(0)),
+    }));
+
+  // ── Ranked lists ──
+  const topProducts: RankedItem[] = profitBy(windowRows, (row) => ({
     key: row.productId,
     label: row.productName,
   }))
@@ -165,7 +214,28 @@ export default async function OverviewPage() {
     .map((entry) => ({
       name: entry.label,
       revenue: Number(entry.revenue.toFixed(0)),
-      marginPct: entry.marginPct ? Number(entry.marginPct.toFixed(0)) : 0,
+      ...(hasCogs && entry.marginPct !== null
+        ? { marginPct: Number(entry.marginPct.toFixed(0)) }
+        : {}),
+    }));
+
+  const expenseGroups = new Map<string, { total: Decimal; category: string }>();
+  for (const row of windowRows) {
+    if (row.type !== "expense" && row.type !== "purchase") continue;
+    const entry = expenseGroups.get(row.productName) ?? {
+      total: new Decimal(0),
+      category: row.categoryName,
+    };
+    entry.total = entry.total.plus(row.total ?? 0);
+    expenseGroups.set(row.productName, entry);
+  }
+  const topExpenses: RankedItem[] = [...expenseGroups.entries()]
+    .sort((a, b) => b[1].total.minus(a[1].total).toNumber())
+    .slice(0, 6)
+    .map(([name, entry]) => ({
+      name,
+      revenue: Number(entry.total.toFixed(0)),
+      hint: entry.category,
     }));
 
   // ── Recent transactions ──
@@ -187,8 +257,7 @@ export default async function OverviewPage() {
   const alerts: AlertFixture[] = [];
   const lowStock = products.filter(
     (product) =>
-      product.reorderLevel !== null &&
-      new Decimal(product.stockQty).lt(product.reorderLevel),
+      product.reorderLevel !== null && new Decimal(product.stockQty).lt(product.reorderLevel),
   );
   if (lowStock.length > 0) {
     alerts.push({
@@ -200,19 +269,18 @@ export default async function OverviewPage() {
           : `${lowStock.length} products are below their reorder level.`,
     });
   }
-  const anomalies = ledger.filter((row) => row.notes?.includes("anomaly"));
-  if (anomalies.length > 0) {
+  if (unpaid.gt(0)) {
     alerts.push({
       severity: "warning",
-      title: `${anomalies.length} ledger anomalies`,
-      detail: "Rows where the arithmetic or price looks wrong — see Analytics.",
+      title: `Unpaid sales: ${formatMoney(Number(unpaid.toFixed(0)))}`,
+      detail: "Rows marked غير مدفوع in the sales ledger.",
     });
   }
-  if (revenueDelta < -10) {
+  if (net.isNegative()) {
     alerts.push({
       severity: "info",
-      title: "Revenue dip",
-      detail: `This month is ${Math.abs(revenueDelta)}% below last month so far.`,
+      title: `Costs exceed revenue by ${formatMoney(Number(net.abs().toFixed(0)))}`,
+      detail: "Includes one-off investments like land and construction.",
     });
   }
 
@@ -229,20 +297,32 @@ export default async function OverviewPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle>Revenue & costs</CardTitle>
-            <CardDescription>Monthly totals from the ledger</CardDescription>
+            <CardTitle>{hasTimeline ? "Revenue & costs" : "The money story"}</CardTitle>
+            <CardDescription>
+              {hasTimeline
+                ? "Monthly totals from the ledger"
+                : "Totals from the ledger — the file carries no dates, so there is no timeline yet"}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <RevenueChart data={revenueSeries} />
+            {hasTimeline ? (
+              <RevenueChart data={revenueSeries} />
+            ) : (
+              <ComparisonChart data={comparisonData} />
+            )}
           </CardContent>
         </Card>
         <Card>
           <CardHeader>
             <CardTitle>Revenue by category</CardTitle>
-            <CardDescription>Share of the last 12 months</CardDescription>
+            <CardDescription>Where the money comes from · {windowLabel}</CardDescription>
           </CardHeader>
           <CardContent>
-            <CategoryDonut data={categoryMix} />
+            {revenueMix.length > 0 ? (
+              <CategoryDonut data={revenueMix} caption={hasTimeline ? "12 months" : "all sales"} />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No sales yet.</p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -250,23 +330,54 @@ export default async function OverviewPage() {
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
           <CardHeader>
-            <CardTitle>Top products</CardTitle>
-            <CardDescription>Revenue and margin, last 12 months</CardDescription>
+            <CardTitle>Costs by section</CardTitle>
+            <CardDescription>Where the money goes · {windowLabel}</CardDescription>
           </CardHeader>
           <CardContent>
-            <TopProducts data={topProducts} />
+            {costMix.length > 0 ? (
+              <CategoryDonut data={costMix} caption={hasTimeline ? "12 months" : "all costs"} />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No costs recorded.</p>
+            )}
           </CardContent>
         </Card>
-        <Card className="lg:col-span-2">
+        <Card>
           <CardHeader>
-            <CardTitle>Recent transactions</CardTitle>
-            <CardDescription>The latest ledger entries</CardDescription>
+            <CardTitle>Top products</CardTitle>
+            <CardDescription>By revenue · {windowLabel}</CardDescription>
           </CardHeader>
           <CardContent>
-            <RecentTransactions data={recent} />
+            {topProducts.length > 0 ? (
+              <TopProducts data={topProducts} />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No sales yet.</p>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Biggest cost items</CardTitle>
+            <CardDescription>By amount · {windowLabel}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {topExpenses.length > 0 ? (
+              <TopProducts data={topExpenses} barClass="bg-chart-4" />
+            ) : (
+              <p className="py-10 text-center text-sm text-muted-foreground">No costs recorded.</p>
+            )}
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent transactions</CardTitle>
+          <CardDescription>The latest ledger entries</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RecentTransactions data={recent} />
+        </CardContent>
+      </Card>
     </div>
   );
 }
