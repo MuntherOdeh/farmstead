@@ -19,12 +19,11 @@ Private farm-operations dashboard: Excel import with schema inference, product C
 - **React Hook Form + Zod** (schemas shared client/server) · **date-fns** · **decimal.js** for money · **lucide-react** · **framer-motion** (sparingly)
 - **Vitest** (inference engine) · **Playwright** (login→import→dashboard happy path)
 
-## npm scripts
+## npm scripts (all implemented)
 
-- `dev` / `build` / `start`
-- `typecheck` — `tsc --noEmit`
-- `lint` — ESLint
-- `test` — Vitest · `test:e2e` — Playwright
+- `dev` / `build` / `start` — `build` runs `check-contrast` first and fails on any WCAG violation
+- `typecheck` — `tsc --noEmit` · `lint` — ESLint
+- `test` — Vitest (import inference, widgets, analytics) · `test:e2e` — Playwright via system Edge (`npm run build` first)
 - `db:generate` / `db:migrate` / `db:seed` / `db:studio` — drizzle-kit + seed
 - `gen:sample-xlsx` — writes clean + messy sample workbooks to `public/samples/`
 - `check-contrast` — walks all theme token pairs, fails build below WCAG AA
