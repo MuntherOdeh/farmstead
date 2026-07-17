@@ -2,6 +2,10 @@
 
 Dated entries for every deviation from `SPEC.md` and every non-obvious call.
 
+## 2026-07-17 — Trial 3: the owner's real Arabic workbook, ingested and taught to the app
+
+The owner's workbook (ملخص، المصاريف، المبيعات، الأرض، المبلغ المستثمر) had all sheets saved reference-only after a Start-fresh, leaving the ledger empty. One-time server-side ingestion converted المصاريف → 78 expense rows ($94,589), الأرض paid amounts → 5 purchases ($56,000; the sheet's remaining/full-price kept in notes), المبيعات → 14 sales ($13,746.25, excluding the sheet's own مدفوع/غير مدفوع subtotal rows) — reconciling exactly with the ملخص totals (150,589 / 13,746.25). المبلغ المستثمر stays reference-only: family capital transfers aren't farm operations. All rows are undated in the file, so they carry the ingestion date. The pipeline itself now learned the patterns: القسم→category (find-or-create with Arabic names + kind inference), البيان→item, سعر المفرد→unit price, quantities parsed out of names (عدد 6 → head; 33كغ → kg), and sheet-name-based default types (مصاريف→expense). Rollback bookkeeping preserved per sheet.
+
 ## 2026-07-16 — PGlite for local development, Neon in production
 
 The owner asked for all milestones to be finished without further questions, and no Neon `DATABASE_URL` exists yet (and no Docker on this machine). Local dev therefore runs on **PGlite** (embedded, file-backed Postgres at `.pglite/`, gitignored) — real Postgres semantics, zero install. `src/db/index.ts` picks the driver at runtime: `DATABASE_URL` present → `@neondatabase/serverless` HTTP driver (the spec's locked choice); absent → PGlite via dynamic import so it never loads in production. The same drizzle migrations apply to both; `drizzle.config.ts` mirrors the switch for `db:*` commands. When the owner creates the Neon database, setting `DATABASE_URL` is the only change needed.
