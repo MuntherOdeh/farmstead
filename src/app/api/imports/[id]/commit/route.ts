@@ -93,19 +93,32 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
       .where(eq(importRows.importId, id))
       .orderBy(asc(importRows.rowIndex));
 
-    // Resolve units by code (normalized), with a piece fallback.
-    const unitRows = await db.select().from(units);
+    // Resolve units by code (normalized), bootstrapping the essentials on a
+    // completely fresh database so a first import never dead-ends.
+    let unitRows = await db.select().from(units);
+    if (unitRows.length === 0) {
+      await db.insert(units).values([
+        { code: "pcs", label: "Piece", dimension: "count", toBaseFactor: "1", isSystem: true },
+        { code: "head", label: "Head", dimension: "count", toBaseFactor: "1", isSystem: true },
+        { code: "kg", label: "Kilogram", dimension: "mass", toBaseFactor: "1", isSystem: true },
+        { code: "L", label: "Litre", dimension: "volume", toBaseFactor: "1", isSystem: true },
+      ]);
+      unitRows = await db.select().from(units);
+    }
     const unitByCode = new Map(unitRows.map((u) => [normalizeHeader(u.code), u.id]));
     const fallbackUnitId =
-      unitByCode.get("pcs") ?? unitByCode.get("head") ?? unitRows[0]?.id ?? null;
+      unitByCode.get("pcs") ?? unitByCode.get("head") ?? unitRows[0].id;
 
     // Category fallback for created products.
-    const categoryRows = await db.select().from(categories).where(isNull(categories.deletedAt));
-    const otherCategory =
-      categoryRows.find((c) => c.slug === "other")?.id ?? categoryRows[0]?.id;
-    if (!otherCategory || !fallbackUnitId) {
-      return jsonError(409, "Categories/units missing — run the seed first.");
+    let categoryRows = await db.select().from(categories).where(isNull(categories.deletedAt));
+    if (categoryRows.length === 0) {
+      await db
+        .insert(categories)
+        .values({ name: "Other", slug: "other", kind: "other", isSystem: true });
+      categoryRows = await db.select().from(categories).where(isNull(categories.deletedAt));
     }
+    const otherCategory =
+      categoryRows.find((c) => c.slug === "other")?.id ?? categoryRows[0].id;
 
     // Per-product context from the rows: the قسم/category column and any
     // unit parsed out of the item names ("عدد 6" → head, "33كغ" → kg).
@@ -188,8 +201,23 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     let skippedNoProduct = 0;
     let skippedByChoice = 0;
 
+    // Subtotal/total pseudo-rows are layout, not data — never ledger them.
+    // NOTE: \b is useless after Arabic letters, so use exact/prefix tests.
+    const isSubtotalName = (name: string) => {
+      const trimmed = name.trim();
+      return (
+        /^(مدفوع|غير مدفوع|المجموع)$/.test(trimmed) ||
+        /^(إجمالي|الإجمالي|الاجمالي)/.test(trimmed) ||
+        /^total\b/i.test(trimmed)
+      );
+    };
+
     for (const stored of storedRows) {
       const row = stored.normalized as NormalizedRowWire;
+      if (row.productName && isSubtotalName(row.productName)) {
+        skippedNoProduct++;
+        continue;
+      }
       const nameKey = row.productName ? normalizeHeader(row.productName) : null;
       const match = nameKey ? matchByName.get(nameKey) : undefined;
       if (match?.action === "skip") {

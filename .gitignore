@@ -36,3 +36,6 @@ Thumbs.db
 # owner's real financial data — never commit
 Trial 2.xlsx
 *.trial.xlsx
+
+# owner's real workbooks
+file/

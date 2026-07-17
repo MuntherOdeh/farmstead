@@ -1,6 +1,14 @@
 "use client";
 
-import { BookOpen, CircleCheck, FileSpreadsheet, Layers, Loader2 } from "lucide-react";
+import {
+  BookOpen,
+  CircleCheck,
+  CircleX,
+  FileSpreadsheet,
+  Layers,
+  Loader2,
+  Sparkles,
+} from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -33,19 +41,33 @@ import {
 } from "@/components/ui/table";
 import { MappingReview } from "@/components/import/mapping-review";
 import { UploadDropzone } from "@/components/import/upload-dropzone";
+import {
+  applyPlanToMapping,
+  detectFarmWorkbook,
+  planForSheet,
+  type SheetPlan,
+} from "@/lib/import/farm-workbook";
 import { normalizeRows } from "@/lib/import/normalize";
 import { computeQuality } from "@/lib/import/quality";
 import { headerSignature } from "@/lib/import/signature";
 import type {
   ImportMapping,
   InferredSchema,
+  NormalizedRow,
   ParsedSheet,
   SemanticRole,
 } from "@/lib/import/types";
 import type { ParseWorkerResponse } from "@/lib/import/parse.worker";
 import type { CategoryOption } from "@/lib/products/queries";
 
-type Step = "upload" | "sheet" | "review" | "match" | "commit" | "done";
+type Step = "upload" | "workbook" | "sheet" | "review" | "match" | "commit" | "done";
+
+interface WorkbookSheetState {
+  plan: SheetPlan;
+  status: "pending" | "running" | "done" | "failed";
+  detail: string | null;
+  importId: string | null;
+}
 
 interface MatchState {
   name: string;
@@ -129,6 +151,8 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
   /** Remaining sheets when importing a whole workbook sheet-by-sheet. */
   const [sheetQueue, setSheetQueue] = useState<string[]>([]);
   const [referenceOnly, setReferenceOnly] = useState(false);
+  const [workbook, setWorkbook] = useState<WorkbookSheetState[]>([]);
+  const [workbookRunning, setWorkbookRunning] = useState(false);
   const [sheet, setSheet] = useState<ParsedSheet | null>(null);
   const [schema, setSchema] = useState<InferredSchema | null>(null);
   const [mapping, setMapping] = useState<ImportMapping | null>(null);
@@ -168,6 +192,19 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
       }
       setSheetNames(data.sheetNames);
       if (sheetName === null && data.sheetNames.length > 1) {
+        // Known farm workbook → offer fully automatic ingestion.
+        if (detectFarmWorkbook(data.sheetNames)) {
+          setWorkbook(
+            data.sheetNames.map((name) => ({
+              plan: planForSheet(name),
+              status: "pending",
+              detail: null,
+              importId: null,
+            })),
+          );
+          setStep("workbook");
+          return;
+        }
         setStep("sheet");
         return;
       }
@@ -232,6 +269,129 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
     if (!next) return;
     setSheetQueue(rest);
     pickSheet(next);
+  }
+
+  /** Worker parse as a promise — used by the automatic workbook flow. */
+  function parseAsync(buffer: ArrayBuffer, sheetName: string) {
+    return new Promise<Extract<ParseWorkerResponse, { ok: true }>>((resolve, reject) => {
+      const worker = new Worker(new URL("../../lib/import/parse.worker.ts", import.meta.url));
+      worker.onmessage = (event: MessageEvent<ParseWorkerResponse>) => {
+        worker.terminate();
+        if (event.data.ok) resolve(event.data);
+        else reject(new Error(event.data.error));
+      };
+      worker.onerror = () => {
+        worker.terminate();
+        reject(new Error("Could not read the sheet."));
+      };
+      worker.postMessage({ buffer, sheetName }, [buffer]);
+    });
+  }
+
+  function buildPayloadRows(
+    sheetData: ParsedSheet,
+    mappingData: ImportMapping,
+    rowsData: NormalizedRow[],
+  ) {
+    const byIndex = new Map(sheetData.columns.map((column) => [column.index, column]));
+    return rowsData.map((row) => {
+      const raw: Record<string, unknown> = {};
+      for (const column of mappingData.columns) {
+        const cell = byIndex.get(column.index)?.cells[row.rowIndex];
+        raw[column.header] =
+          cell?.v instanceof Date ? cell.v.toISOString().slice(0, 10) : (cell?.v ?? null);
+      }
+      return { rowIndex: row.rowIndex, raw, normalized: row };
+    });
+  }
+
+  /** The zero-decision path: every sheet parsed, mapped by its meaning,
+   *  uploaded and committed — types, names and categories from the file. */
+  async function runWorkbook() {
+    if (!bufferRef.current) return;
+    setWorkbookRunning(true);
+    for (let i = 0; i < workbook.length; i++) {
+      const entry = workbook[i];
+      const update = (patch: Partial<WorkbookSheetState>) =>
+        setWorkbook((current) =>
+          current.map((e, index) => (index === i ? { ...e, ...patch } : e)),
+        );
+      update({ status: "running" });
+      try {
+        const res = await parseAsync(bufferRef.current.slice(0), entry.plan.sheetName);
+        const mappingData = applyPlanToMapping(
+          defaultMapping(res.schema, entry.plan.sheetName),
+          entry.plan,
+        );
+        const rowsData = normalizeRows(res.sheet, mappingData);
+        if (rowsData.length === 0) {
+          update({ status: "done", detail: "لا صفوف قابلة للاستيراد" });
+          continue;
+        }
+        const qualityData = computeQuality(res.sheet, mappingData, rowsData);
+        const sig = await headerSignature(res.sheet.columns.map((c) => c.header));
+        const { id } = await postJson<{ id: string }>("/api/imports", {
+          filename,
+          sheetName: entry.plan.sheetName,
+          signature: sig,
+          rowCount: rowsData.length,
+          mapping: mappingData,
+          inferredSchema: res.schema,
+          quality: qualityData,
+        });
+        const payloadRows = buildPayloadRows(res.sheet, mappingData, rowsData);
+        for (let off = 0; off < payloadRows.length; off += CHUNK_SIZE) {
+          await postJson(`/api/imports/${id}/rows`, {
+            chunkIndex: Math.floor(off / CHUNK_SIZE),
+            rows: payloadRows.slice(off, off + CHUNK_SIZE),
+          });
+        }
+        let matchesPayload: {
+          name: string;
+          action: "map" | "create" | "skip";
+          productId: string | null;
+          categoryId: string | null;
+        }[] = [];
+        if (!entry.plan.referenceOnly) {
+          const names = [
+            ...new Set(
+              rowsData
+                .map((row) => row.productName)
+                .filter((name): name is string => name !== null),
+            ),
+          ].slice(0, 2000);
+          if (names.length > 0) {
+            const { matches: found } = await postJson<{
+              matches: { name: string; productId: string | null; score: number }[];
+            }>("/api/imports/match-products", { names });
+            matchesPayload = found.map((m) => ({
+              name: m.name,
+              action: m.productId && m.score >= 0.85 ? "map" : "create",
+              productId: m.productId && m.score >= 0.85 ? m.productId : null,
+              categoryId: null,
+            }));
+          }
+        }
+        const result = await postJson<CommitResult>(`/api/imports/${id}/commit`, {
+          referenceOnly: entry.plan.referenceOnly,
+          matches: matchesPayload,
+        });
+        update({
+          status: "done",
+          importId: id,
+          detail: entry.plan.referenceOnly
+            ? "محفوظ كبيانات مرجعية"
+            : `${result.transactions} حركة${result.createdProducts ? ` · ${result.createdProducts} منتج جديد` : ""}`,
+        });
+      } catch (error) {
+        update({
+          status: "failed",
+          detail: error instanceof Error ? error.message : "فشل الاستيراد",
+        });
+      }
+    }
+    setWorkbookRunning(false);
+    router.refresh();
   }
 
   async function continueToMatch() {
@@ -356,11 +516,89 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
     setImportId(null);
     setSheetQueue([]);
     setReferenceOnly(false);
+    setWorkbook([]);
+    setWorkbookRunning(false);
     bufferRef.current = null;
   }
 
   if (step === "upload") {
     return <UploadDropzone busy={busy} onFile={(file) => void handleFile(file)} />;
+  }
+
+  if (step === "workbook") {
+    const finished = workbook.every((e) => e.status === "done" || e.status === "failed");
+    const started = workbook.some((e) => e.status !== "pending");
+    const flowCount = workbook.filter((e) => !e.plan.referenceOnly).length;
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Sparkles className="size-4" /> تم التعرف على ملف حسابات المزرعة
+          </CardTitle>
+          <CardDescription>
+            “{filename}” — {workbook.length} أوراق. الاستيراد تلقائي بالكامل:
+            الأنواع والأسماء والأقسام والكميات تُقرأ من الملف نفسه.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div dir="rtl" className="flex flex-col gap-2">
+            {workbook.map((entry) => (
+              <div
+                key={entry.plan.sheetName}
+                className="flex items-center gap-3 rounded-lg border px-3 py-2.5"
+              >
+                {entry.status === "running" ? (
+                  <Loader2 className="size-4 shrink-0 animate-spin" />
+                ) : entry.status === "done" ? (
+                  <CircleCheck className="size-4 shrink-0" />
+                ) : entry.status === "failed" ? (
+                  <CircleX className="size-4 shrink-0 text-destructive" />
+                ) : (
+                  <FileSpreadsheet className="size-4 shrink-0 text-muted-foreground" />
+                )}
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{entry.plan.sheetName}</p>
+                  <p className="truncate text-sm text-muted-foreground">
+                    {entry.detail ?? entry.plan.label}
+                  </p>
+                </div>
+                {entry.importId ? (
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link href={`/data/${entry.importId}`}>فتح</Link>
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </div>
+
+          {!started ? (
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <Button variant="outline" onClick={() => setStep("sheet")} disabled={workbookRunning}>
+                أفضّل الاستيراد يدوياً
+              </Button>
+              <Button onClick={() => void runWorkbook()} disabled={workbookRunning}>
+                <Sparkles className="size-4" />
+                استورد كل شيء تلقائياً ({flowCount} أوراق حركات)
+              </Button>
+            </div>
+          ) : finished ? (
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button asChild>
+                <Link href="/">افتح لوحة النظرة العامة</Link>
+              </Button>
+              <Button variant="outline" asChild>
+                <Link href="/transactions">الحركات</Link>
+              </Button>
+              <Button variant="ghost" onClick={reset}>
+                ملف آخر
+              </Button>
+            </div>
+          ) : (
+            <p className="text-end text-sm text-muted-foreground">جارٍ الاستيراد…</p>
+          )}
+        </CardContent>
+      </Card>
+    );
   }
 
   if (step === "sheet") {
