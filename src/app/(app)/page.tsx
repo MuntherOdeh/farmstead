@@ -1,5 +1,8 @@
 import Decimal from "decimal.js";
 import { format, subMonths } from "date-fns";
+import { Upload } from "lucide-react";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -7,6 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  Empty,
+  EmptyContent,
+  EmptyDescription,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+} from "@/components/ui/empty";
 import { AlertsStrip } from "@/components/dashboard/alerts-card";
 import { CategoryDonut } from "@/components/dashboard/category-donut";
 import { KpiCard } from "@/components/dashboard/kpi-card";
@@ -33,8 +44,37 @@ import { formatMoney } from "@/lib/format";
 import { requireUser } from "@/lib/auth/require-user";
 
 export default async function OverviewPage() {
-  await requireUser();
+  const user = await requireUser();
   const [ledger, products] = await Promise.all([loadLedger(), loadProductSnapshots()]);
+
+  // Fresh farm: nothing to chart yet — say so instead of a wall of zeros.
+  if (ledger.length === 0 && products.length === 0) {
+    return (
+      <Empty className="min-h-[70vh]">
+        <EmptyHeader>
+          <EmptyMedia variant="icon">
+            <Upload />
+          </EmptyMedia>
+          <EmptyTitle>The farm is empty</EmptyTitle>
+          <EmptyDescription>
+            Import your spreadsheets and this page fills itself with revenue,
+            margins, categories and alerts — or load the demo data from
+            Settings to see it working.
+          </EmptyDescription>
+        </EmptyHeader>
+        <EmptyContent className="flex-row justify-center gap-2">
+          <Button asChild>
+            <Link href="/import">Import a spreadsheet</Link>
+          </Button>
+          {user.role === "admin" ? (
+            <Button variant="outline" asChild>
+              <Link href="/settings">Load demo data</Link>
+            </Button>
+          ) : null}
+        </EmptyContent>
+      </Empty>
+    );
+  }
 
   const now = new Date();
   const thisMonth = format(now, "yyyy-MM");

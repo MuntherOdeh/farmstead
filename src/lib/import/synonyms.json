@@ -1,11 +1,11 @@
 {
   "roles": {
     "period": ["date", "day", "month", "period", "time", "when", "sold on", "sale date", "transaction date", "التاريخ", "تاريخ", "اليوم", "الشهر", "تاريخ البيع"],
-    "entity_type": ["type", "category", "kind", "group", "class", "product type", "item type", "النوع", "الفئة", "التصنيف", "الصنف"],
-    "entity_name": ["product", "item", "name", "product name", "item name", "description", "goods", "animal", "commodity", "المنتج", "البضاعة", "اسم المنتج", "الاسم", "الصنف", "المادة"],
+    "entity_type": ["type", "category", "kind", "group", "class", "product type", "item type", "النوع", "الفئة", "التصنيف", "القسم", "قسم"],
+    "entity_name": ["product", "item", "name", "product name", "item name", "description", "goods", "animal", "commodity", "المنتج", "البضاعة", "اسم المنتج", "الاسم", "الصنف", "المادة", "البيان", "بيان", "البند"],
     "quantity": ["quantity", "qty", "count", "number", "amount sold", "units", "head", "heads", "pieces", "pcs", "no", "num", "عدد", "الكمية", "كمية", "العدد", "رؤوس", "رأس"],
     "unit": ["unit", "uom", "measure", "unit of measure", "per", "الوحدة", "وحدة القياس", "وحدة"],
-    "unit_price": ["price", "unit price", "price per unit", "rate", "price each", "unit cost", "price/unit", "سعر", "السعر", "سعر الوحدة", "سعر الافرادي"],
+    "unit_price": ["price", "unit price", "price per unit", "rate", "price each", "unit cost", "price/unit", "سعر", "السعر", "سعر الوحدة", "سعر الافرادي", "سعر المفرد", "المفرد"],
     "total_amount": ["total", "amount", "total price", "total amount", "value", "sum", "revenue", "line total", "gross", "subtotal", "الإجمالي", "الاجمالي", "المجموع", "المبلغ", "القيمة", "الإيراد"],
     "cost": ["cost", "cost price", "unit cost", "cogs", "expense", "purchase price", "التكلفة", "الكلفة", "سعر الشراء", "المصروف"],
     "party": ["customer", "client", "buyer", "supplier", "vendor", "party", "sold to", "purchased from", "account", "contact", "الزبون", "العميل", "المشتري", "المورد", "الجهة", "البائع"],

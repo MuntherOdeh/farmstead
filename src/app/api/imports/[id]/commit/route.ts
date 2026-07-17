@@ -13,6 +13,25 @@ type Params = { params: Promise<{ id: string }> };
 const asMoney = (value: string | null) =>
   value === null ? null : new Decimal(value).toDecimalPlaces(4).toFixed(4);
 
+// Arabic farm-section names → category kinds, so sections imported from the
+// owner's ledgers land with sensible kinds. Anything unknown becomes "other".
+const ARABIC_KINDS: Array<[RegExp, "livestock" | "dairy" | "apiary" | "crop" | "input" | "equipment" | "other"]> = [
+  [/نحل|عسل/, "apiary"],
+  [/غنم|خروف|أغنام|ماعز|بقر|عجل|دواجن|دجاج/, "livestock"],
+  [/حليب|جبنة|لبن|ألبان|قريشة|سمنة/, "dairy"],
+  [/زراعة|محصول|زيتون|قمح/, "crop"],
+  [/وقود|أعلاف|علف|بناء|سماد/, "input"],
+  [/معدات|آليات|أدوات/, "equipment"],
+];
+
+/** Slug that stays unique for non-Latin names (plain slugify strips Arabic). */
+const anySlug = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") ||
+  `cat-${Buffer.from(name).toString("hex").slice(0, 24)}`;
+
 /**
  * Turn stored normalized rows into real ledger rows (SPEC §5.4). Everything
  * created here is recorded on the import batch so rollback removes the whole
@@ -88,6 +107,41 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
       return jsonError(409, "Categories/units missing — run the seed first.");
     }
 
+    // Per-product context from the rows: the قسم/category column and any
+    // unit parsed out of the item names ("عدد 6" → head, "33كغ" → kg).
+    const categoryNameByProduct = new Map<string, string>();
+    const unitCodeByProduct = new Map<string, string>();
+    for (const stored of storedRows) {
+      const row = stored.normalized as NormalizedRowWire;
+      if (!row.productName) continue;
+      const key = normalizeHeader(row.productName);
+      if (row.categoryName && !categoryNameByProduct.has(key)) {
+        categoryNameByProduct.set(key, row.categoryName.trim());
+      }
+      if (row.unitCode && !unitCodeByProduct.has(key)) {
+        unitCodeByProduct.set(key, row.unitCode);
+      }
+    }
+
+    // Find-or-create categories named in the file (Arabic names welcome).
+    const categoryIdByName = new Map(
+      categoryRows.map((c) => [normalizeHeader(c.name), c.id]),
+    );
+    const createdCategoryIds: string[] = [];
+    async function resolveCategory(name: string): Promise<string> {
+      const key = normalizeHeader(name);
+      const existing = categoryIdByName.get(key);
+      if (existing) return existing;
+      const kind = ARABIC_KINDS.find(([re]) => re.test(name))?.[1] ?? "other";
+      const [row] = await db
+        .insert(categories)
+        .values({ name, slug: anySlug(name), kind, isSystem: false, createdBy: user.id })
+        .returning({ id: categories.id });
+      categoryIdByName.set(key, row.id);
+      createdCategoryIds.push(row.id);
+      return row.id;
+    }
+
     // Product resolution per the confirmed matches.
     const matchByName = new Map(
       body.matches.map((match) => [normalizeHeader(match.name), match]),
@@ -100,12 +154,20 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
       if (match.action === "map" && match.productId) {
         productIdByName.set(key, match.productId);
       } else if (match.action === "create") {
+        const sectionName = categoryNameByProduct.get(key);
+        const categoryId =
+          match.categoryId ??
+          (sectionName ? await resolveCategory(sectionName) : otherCategory);
+        const parsedUnit = unitCodeByProduct.get(key);
+        const unitId =
+          (parsedUnit ? unitByCode.get(normalizeHeader(parsedUnit)) : undefined) ??
+          fallbackUnitId;
         const [row] = await db
           .insert(products)
           .values({
             name: match.name,
-            categoryId: match.categoryId ?? otherCategory,
-            unitId: fallbackUnitId,
+            categoryId,
+            unitId,
             currency,
             stockQty: "0.0000",
             attributes: {},
@@ -188,6 +250,7 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
           matches: body.matches,
           createdProductIds,
           createdPartyIds,
+          createdCategoryIds,
         },
       })
       .where(eq(imports.id, id));

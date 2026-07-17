@@ -85,6 +85,7 @@ export function normalizeRows(sheet: ParsedSheet, mapping: ImportMapping): Norma
 
   const dateCol = roleColumn("period");
   const nameCol = roleColumn("entity_name");
+  const categoryCol = roleColumn("entity_type");
   const qtyCol = roleColumn("quantity");
   const unitCol = roleColumn("unit");
   const priceCol = roleColumn("unit_price");
@@ -93,7 +94,7 @@ export function normalizeRows(sheet: ParsedSheet, mapping: ImportMapping): Norma
   const typeCol = roleColumn("transaction_type");
   const notesCol = roleColumn("notes");
   const handled = new Set(
-    [dateCol, nameCol, qtyCol, unitCol, priceCol, totalCol, partyCol, typeCol, notesCol]
+    [dateCol, nameCol, categoryCol, qtyCol, unitCol, priceCol, totalCol, partyCol, typeCol, notesCol]
       .filter(Boolean)
       .map((column) => column!.index),
   );
@@ -114,6 +115,25 @@ export function normalizeRows(sheet: ParsedSheet, mapping: ImportMapping): Norma
     let qty = qtyCol ? cellToDecimalString(qtyRaw) : null;
     if (qtyCol && qtyRaw.v !== null && qty === null) {
       problems.push(`${qtyCol.header}: "${String(qtyRaw.v)}" is not a number`);
+    }
+
+    // Arabic ledgers often embed the quantity in the item name — "غنم عدد 6"
+    // (six head) or "جبنة 33كغ" (33 kg). When no quantity column supplied a
+    // value, pull it out of the name.
+    let productName = nameCol ? cellToText(cellAt(nameCol.index)) : null;
+    let embeddedUnit: string | null = null;
+    if (productName && qty === null) {
+      const head = productName.match(/^(.*?)\s*عدد\s*(\d+(?:[.,]\d+)?)\s*$/);
+      const mass = productName.match(/^(.*?)\s*(\d+(?:[.,]\d+)?)\s*(?:كغ|كيلو)\s*$/);
+      if (head) {
+        productName = head[1].trim() || productName;
+        qty = head[2].replace(",", ".");
+        embeddedUnit = "head";
+      } else if (mass) {
+        productName = mass[1].trim() || productName;
+        qty = mass[2].replace(",", ".");
+        embeddedUnit = "kg";
+      }
     }
 
     const priceRaw = cellAt(priceCol?.index);
@@ -168,9 +188,10 @@ export function normalizeRows(sheet: ParsedSheet, mapping: ImportMapping): Norma
     rows.push({
       rowIndex: r,
       date,
-      productName: nameCol ? cellToText(cellAt(nameCol.index)) : null,
+      productName,
+      categoryName: categoryCol ? cellToText(cellAt(categoryCol.index)) : null,
       qty,
-      unitCode: unitCol ? cellToText(cellAt(unitCol.index)) : null,
+      unitCode: (unitCol ? cellToText(cellAt(unitCol.index)) : null) ?? embeddedUnit,
       unitPrice,
       total,
       party: partyCol ? cellToText(cellAt(partyCol.index)) : null,

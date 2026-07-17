@@ -119,6 +119,55 @@ describe("normalizeRows", () => {
   });
 });
 
+describe("normalizeRows — Arabic ledger patterns", () => {
+  it("extracts the قسم column as categoryName", () => {
+    const s = sheet([
+      column("القسم", ["نحل", "غنم"]),
+      column("البيان", ["شراء خلايا", "طبابة"]),
+      column("المبلغ ($)", [1235, 765]),
+    ]);
+    const rows = normalizeRows(
+      s,
+      mappingFor(s, { "القسم": "entity_type", "البيان": "entity_name", "المبلغ ($)": "total_amount" }),
+    );
+    expect(rows[0]).toMatchObject({
+      categoryName: "نحل",
+      productName: "شراء خلايا",
+      total: "1235",
+    });
+    expect(rows[1].categoryName).toBe("غنم");
+  });
+
+  it("parses quantities embedded in item names — عدد N and N كغ", () => {
+    const s = sheet([
+      column("البيان", ["غنم عدد 6", "جبنة 33كغ", "قريشة 130 كغ", "سمنة"]),
+      column("المبلغ", [864, 100, 295, 13]),
+    ]);
+    const rows = normalizeRows(
+      s,
+      mappingFor(s, { "البيان": "entity_name", "المبلغ": "total_amount" }),
+    );
+    expect(rows[0]).toMatchObject({ productName: "غنم", qty: "6", unitCode: "head" });
+    expect(rows[1]).toMatchObject({ productName: "جبنة", qty: "33", unitCode: "kg" });
+    expect(rows[2]).toMatchObject({ productName: "قريشة", qty: "130", unitCode: "kg" });
+    expect(rows[3]).toMatchObject({ productName: "سمنة", qty: null, unitCode: null });
+  });
+
+  it("prefers an explicit quantity column over name parsing", () => {
+    const s = sheet([
+      column("البيان", ["غنم عدد 6"]),
+      column("العدد", [4]),
+      column("المبلغ", [864]),
+    ]);
+    const rows = normalizeRows(
+      s,
+      mappingFor(s, { "البيان": "entity_name", "العدد": "quantity", "المبلغ": "total_amount" }),
+    );
+    expect(rows[0].qty).toBe("4");
+    expect(rows[0].productName).toBe("غنم عدد 6");
+  });
+});
+
 describe("computeQuality", () => {
   it("finds duplicates, anomalies, blanks, range and outliers", () => {
     // 14 rows: a single extreme among n values can only exceed 3σ when

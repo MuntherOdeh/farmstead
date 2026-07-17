@@ -42,6 +42,7 @@ export const normalizedRowSchema = z.object({
   rowIndex: z.number().int().min(0),
   date: z.string().nullable(),
   productName: z.string().nullable(),
+  categoryName: z.string().nullable().optional().default(null),
   qty: z.string().nullable(),
   unitCode: z.string().nullable(),
   unitPrice: z.string().nullable(),

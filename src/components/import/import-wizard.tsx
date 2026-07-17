@@ -67,7 +67,14 @@ interface CommitResult {
 
 const CHUNK_SIZE = 1000;
 
-function defaultMapping(schema: InferredSchema): ImportMapping {
+/** مصاريف → expense, مبيعات → sale, مشتريات → purchase — from the sheet name. */
+function defaultTypeForSheet(sheetName: string): ImportMapping["defaultTransactionType"] {
+  if (/مصاريف|مصروف|expense/i.test(sheetName)) return "expense";
+  if (/مشتريات|شراء|purchase/i.test(sheetName)) return "purchase";
+  return "sale";
+}
+
+function defaultMapping(schema: InferredSchema, sheetName: string): ImportMapping {
   // Only one column per exclusive role — extra claimants fall back.
   const exclusive: SemanticRole[] = [
     "period", "entity_name", "quantity", "unit", "unit_price", "total_amount", "party", "transaction_type", "notes",
@@ -95,7 +102,7 @@ function defaultMapping(schema: InferredSchema): ImportMapping {
     }),
     currency: schema.crossChecks.detectedCurrency ?? "USD",
     authoritativeAmount: "total",
-    defaultTransactionType: "sale",
+    defaultTransactionType: defaultTypeForSheet(sheetName),
   };
 }
 
@@ -186,7 +193,7 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
         // Profile lookup is best-effort; inference still stands.
       }
       if (!applied) setProfileName(null);
-      setMapping(applied ?? defaultMapping(data.schema));
+      setMapping(applied ?? defaultMapping(data.schema, data.sheet.name));
       setStep("review");
     };
     worker.onerror = () => {

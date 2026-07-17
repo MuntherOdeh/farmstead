@@ -6,6 +6,7 @@ function row(partial: Partial<NormalizedRow> & { rowIndex: number }): Normalized
   return {
     date: null,
     productName: null,
+    categoryName: null,
     qty: null,
     unitCode: null,
     unitPrice: null,

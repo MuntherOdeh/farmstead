@@ -127,6 +127,8 @@ export interface NormalizedRow {
   rowIndex: number;
   date: string | null; // yyyy-MM-dd
   productName: string | null;
+  /** From an entity_type (قسم/category) column — drives category assignment. */
+  categoryName: string | null;
   qty: string | null; // decimal string
   unitCode: string | null;
   unitPrice: string | null; // decimal string
