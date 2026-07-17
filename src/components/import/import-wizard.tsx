@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleCheck, FileSpreadsheet, Loader2 } from "lucide-react";
+import { BookOpen, CircleCheck, FileSpreadsheet, Layers, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -14,6 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Table,
   TableBody,
@@ -60,6 +62,7 @@ interface CommitResult {
   createdParties: number;
   skippedNoProduct: number;
   skippedByChoice: number;
+  referenceOnly?: boolean;
 }
 
 const CHUNK_SIZE = 1000;
@@ -116,6 +119,9 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
   const [busy, setBusy] = useState(false);
   const [filename, setFilename] = useState("");
   const [sheetNames, setSheetNames] = useState<string[]>([]);
+  /** Remaining sheets when importing a whole workbook sheet-by-sheet. */
+  const [sheetQueue, setSheetQueue] = useState<string[]>([]);
+  const [referenceOnly, setReferenceOnly] = useState(false);
   const [sheet, setSheet] = useState<ParsedSheet | null>(null);
   const [schema, setSchema] = useState<InferredSchema | null>(null);
   const [mapping, setMapping] = useState<ImportMapping | null>(null);
@@ -202,11 +208,32 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
   function pickSheet(name: string) {
     if (!bufferRef.current) return;
     const buffer = bufferRef.current.slice(0);
+    setCommitResult(null);
+    setImportId(null);
     parseInWorker(buffer, name);
+  }
+
+  /** Queue every sheet of the workbook; each still gets its own review. */
+  function startAllSheets() {
+    if (sheetNames.length === 0) return;
+    setSheetQueue(sheetNames.slice(1));
+    pickSheet(sheetNames[0]);
+  }
+
+  function nextQueuedSheet() {
+    const [next, ...rest] = sheetQueue;
+    if (!next) return;
+    setSheetQueue(rest);
+    pickSheet(next);
   }
 
   async function continueToMatch() {
     if (!mapping) return;
+    // No date column mapped → probably a summary/reference sheet, not ledger
+    // rows. Suggest reference-only; the user can flip it.
+    setReferenceOnly(
+      !mapping.columns.some((column) => column.include && column.role === "period"),
+    );
     setBusy(true);
     try {
       const names = [
@@ -279,6 +306,7 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
       }
 
       const result = await postJson<CommitResult>(`/api/imports/${id}/commit`, {
+        referenceOnly,
         matches: matches.map((match) => ({
           name: match.name,
           action: match.action,
@@ -319,6 +347,8 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
     setProfileName(null);
     setCommitResult(null);
     setImportId(null);
+    setSheetQueue([]);
+    setReferenceOnly(false);
     bufferRef.current = null;
   }
 
@@ -331,14 +361,22 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
       <Card>
         <CardHeader>
           <CardTitle>Pick a sheet</CardTitle>
-          <CardDescription>“{filename}” has {sheetNames.length} sheets.</CardDescription>
+          <CardDescription>
+            “{filename}” has {sheetNames.length} sheets — import one, or run
+            through all of them one after another.
+          </CardDescription>
         </CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {sheetNames.map((name) => (
-            <Button key={name} variant="outline" onClick={() => pickSheet(name)} disabled={busy}>
-              <FileSpreadsheet className="size-4" /> {name}
-            </Button>
-          ))}
+        <CardContent className="flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            {sheetNames.map((name) => (
+              <Button key={name} variant="outline" onClick={() => pickSheet(name)} disabled={busy}>
+                <FileSpreadsheet className="size-4" /> {name}
+              </Button>
+            ))}
+          </div>
+          <Button onClick={startAllSheets} disabled={busy} className="self-start">
+            <Layers className="size-4" /> Import all {sheetNames.length} sheets, one after another
+          </Button>
         </CardContent>
       </Card>
     );
@@ -373,7 +411,24 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {matches.length > 0 ? (
+          <div className="flex items-start justify-between gap-4 rounded-lg border p-3">
+            <div className="flex items-start gap-2.5">
+              <BookOpen className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+              <div>
+                <Label htmlFor="ref-only" className="font-medium">
+                  Reference dataset only — no ledger transactions
+                </Label>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  For summary or balance-style sheets: the data is kept and gets
+                  its own dashboard page, but nothing is written into sales,
+                  products or parties.
+                  {referenceOnly ? " Suggested because no date column is mapped." : ""}
+                </p>
+              </div>
+            </div>
+            <Switch id="ref-only" checked={referenceOnly} onCheckedChange={setReferenceOnly} />
+          </div>
+          {matches.length > 0 && !referenceOnly ? (
             <Table>
               <TableHeader>
                 <TableRow>
@@ -456,7 +511,9 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
             </Button>
             <Button onClick={() => void commit()} disabled={busy}>
               {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-              Import {normalized.length} rows
+              {referenceOnly
+                ? `Save ${normalized.length} rows as reference`
+                : `Import ${normalized.length} rows`}
             </Button>
           </div>
         </CardContent>
@@ -491,19 +548,29 @@ export function ImportWizard({ categories }: { categories: CategoryOption[] }) {
           </span>
           <div>
             <p className="font-heading text-xl font-semibold">
-              Imported {commitResult.transactions} transactions
+              {commitResult.referenceOnly
+                ? `Saved “${sheet?.name ?? filename}” as a reference dataset`
+                : `Imported ${commitResult.transactions} transactions`}
             </p>
             <p className="mt-1 text-sm text-muted-foreground">
-              {commitResult.createdProducts} new products · {commitResult.createdParties} new
-              parties
-              {commitResult.skippedNoProduct + commitResult.skippedByChoice > 0
-                ? ` · ${commitResult.skippedNoProduct + commitResult.skippedByChoice} rows skipped`
-                : ""}
+              {commitResult.referenceOnly
+                ? "No ledger rows were created — open its dashboard to read it."
+                : `${commitResult.createdProducts} new products · ${commitResult.createdParties} new parties${
+                    commitResult.skippedNoProduct + commitResult.skippedByChoice > 0
+                      ? ` · ${commitResult.skippedNoProduct + commitResult.skippedByChoice} rows skipped`
+                      : ""
+                  }`}
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap justify-center gap-2">
+            {sheetQueue.length > 0 ? (
+              <Button onClick={nextQueuedSheet} disabled={busy}>
+                <Layers className="size-4" />
+                Next sheet: “{sheetQueue[0]}” ({sheetQueue.length} left)
+              </Button>
+            ) : null}
             {importId ? (
-              <Button asChild>
+              <Button variant={sheetQueue.length > 0 ? "outline" : "default"} asChild>
                 <Link href={`/data/${importId}`}>Open the dashboard</Link>
               </Button>
             ) : null}

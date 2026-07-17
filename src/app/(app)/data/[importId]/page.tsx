@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -6,11 +6,13 @@ import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { getDb } from "@/db";
-import { dashboards, imports } from "@/db/schema";
+import { dashboards, importRows, imports } from "@/db/schema";
 import { requireUser } from "@/lib/auth/require-user";
 import type { DashboardLayout } from "@/lib/dashboard/actions";
+import { parseFinancialSummary } from "@/lib/import/financial-summary";
 import type { ImportMapping } from "@/lib/import/types";
 import { DataDashboard } from "@/components/data/data-dashboard";
+import { FinancialSummaryView } from "@/components/data/financial-summary-view";
 
 export const metadata: Metadata = { title: "Dataset" };
 
@@ -30,6 +32,18 @@ export default async function DataPage({
     .select({ layout: dashboards.layout })
     .from(dashboards)
     .where(and(eq(dashboards.datasetRef, importId), eq(dashboards.ownerId, user.id)));
+
+  // Structure-aware rendering: Arabic financial-summary sheets get their own
+  // dedicated view instead of the generic widget engine.
+  const rawSample = await db
+    .select({ raw: importRows.raw })
+    .from(importRows)
+    .where(eq(importRows.importId, importId))
+    .orderBy(asc(importRows.rowIndex))
+    .limit(400);
+  const financialSummary = parseFinancialSummary(
+    rawSample.map((row) => row.raw as Record<string, unknown>),
+  );
 
   return (
     <div className="flex flex-col gap-6">
@@ -51,12 +65,15 @@ export default async function DataPage({
           </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
-          A dashboard generated from the file&apos;s own columns — pin, hide,
-          drag or retype any chart; the table below is the ground truth.
+          {financialSummary
+            ? "Recognised as a financial summary sheet — rendered in its own layout, exactly as recorded."
+            : "A dashboard generated from the file's own columns — pin, hide, drag or retype any chart; the table below is the ground truth."}
         </p>
       </div>
 
-      {batch.status === "committed" || batch.status === "rolled_back" ? (
+      {financialSummary ? (
+        <FinancialSummaryView summary={financialSummary} />
+      ) : batch.status === "committed" || batch.status === "rolled_back" ? (
         <DataDashboard
           importId={importId}
           filename={batch.filename}

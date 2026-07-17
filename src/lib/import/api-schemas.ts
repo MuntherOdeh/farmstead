@@ -82,6 +82,9 @@ export const productMatchSchema = z.object({
 
 export const commitSchema = z.object({
   matches: z.array(productMatchSchema),
+  /** Keep the dataset (rows + dashboard) but create NO ledger transactions —
+   *  for summary/reference sheets that aren't transactional data. */
+  referenceOnly: z.boolean().optional().default(false),
 });
 
 export const saveProfileSchema = z.object({

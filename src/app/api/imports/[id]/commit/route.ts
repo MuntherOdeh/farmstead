@@ -30,6 +30,37 @@ export async function POST(request: Request, { params }: Params): Promise<Respon
     if (batch.status === "committed") return jsonError(409, "Already committed");
     await db.update(imports).set({ status: "committing" }).where(eq(imports.id, id));
 
+    // Reference-only: keep the dataset, touch nothing in the ledger.
+    if (body.referenceOnly) {
+      await db
+        .update(imports)
+        .set({
+          status: "committed",
+          mapping: {
+            ...(batch.mapping as Record<string, unknown>),
+            referenceOnly: true,
+            matches: [],
+            createdProductIds: [],
+            createdPartyIds: [],
+          },
+        })
+        .where(eq(imports.id, id));
+      await db.insert(auditLog).values({
+        actorId: user.id,
+        entity: "import",
+        entityId: id,
+        action: "commit-reference-only",
+      });
+      return Response.json({
+        transactions: 0,
+        createdProducts: 0,
+        createdParties: 0,
+        skippedNoProduct: 0,
+        skippedByChoice: 0,
+        referenceOnly: true,
+      });
+    }
+
     const mapping = batch.mapping as {
       currency: string;
       defaultTransactionType: NormalizedRowWire["type"];
