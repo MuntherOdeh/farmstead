@@ -109,6 +109,44 @@ describe("category (entity_type) is the preferred grouping dimension", () => {
     const sheep = byCategory!.data.find((d) => d.label === "غنم");
     expect(sheep!.total).toBe(25280);
   });
+
+  it("does NOT build a stacked bar when البيان is near-unique (nonsense stacking)", () => {
+    // 20 rows across 3 sections, each with a distinct description — البيان is
+    // near-unique so it can't be a meaningful stacking dimension.
+    const many: NormalizedRow[] = Array.from({ length: 20 }, (_, i) =>
+      row({
+        rowIndex: i,
+        categoryName: ["غنم", "نحل", "بقر"][i % 3],
+        productName: `بند فريد رقم ${i}`,
+        total: String(100 + i),
+      }),
+    );
+    const widgets = generateWidgets(expMapping, many);
+    expect(widgets.some((w) => w.kind === "stacked-bar")).toBe(false);
+  });
+
+  it("DOES build a stacked bar when the inner dimension repeats (e.g. status)", () => {
+    const statusMapping: ImportMapping = {
+      columns: [
+        { index: 0, header: "القسم", include: true, type: "text", role: "entity_type", unitCode: null, dateOrder: "DMY" },
+        { index: 1, header: "الحالة", include: true, type: "category", role: "transaction_type", unitCode: null, dateOrder: "DMY" },
+        { index: 2, header: "المبلغ", include: true, type: "decimal", role: "total_amount", unitCode: null, dateOrder: "DMY" },
+      ],
+      currency: "USD",
+      authoritativeAmount: "total",
+      defaultTransactionType: "sale",
+    };
+    const rows2: NormalizedRow[] = Array.from({ length: 18 }, (_, i) =>
+      row({
+        rowIndex: i,
+        categoryName: ["غنم", "بقر", "ألبان"][i % 3],
+        type: i % 2 === 0 ? "sale" : "purchase",
+        total: String(100 + i),
+      }),
+    );
+    const widgets = generateWidgets(statusMapping, rows2);
+    expect(widgets.some((w) => w.kind === "stacked-bar")).toBe(true);
+  });
 });
 
 describe("generateWidgets", () => {

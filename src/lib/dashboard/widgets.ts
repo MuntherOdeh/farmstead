@@ -322,13 +322,34 @@ export function generateWidgets(
     }
   }
 
-  // dimension × dimension + measure → stacked bar
+  // dimension × dimension + measure → stacked bar. Only meaningful when the
+  // INNER (stacking) dimension is a small, REPEATING categorical set — a
+  // near-unique free-text field (e.g. البيان item descriptions) stacks into
+  // nonsense, so require it to be low-cardinality and low-uniqueness.
   if (dimensions.length >= 2 && measures.length > 0) {
-    const [dimA, dimB] = dimensions;
-    const measure = measures[0];
-    const aValues = distinctValues(rows, dimA).slice(0, 10);
-    const bValues = distinctValues(rows, dimB).slice(0, 6);
-    if (aValues.length >= 2 && bValues.length >= 2) {
+    const ranked = dimensions
+      .map((dimension) => {
+        const distinct = distinctValues(rows, dimension).length;
+        const filled = rows.filter((row) => {
+          const value = dimension.get(row);
+          return value !== null && value !== "";
+        }).length;
+        return { dimension, distinct, ratio: filled > 0 ? distinct / filled : 1 };
+      })
+      .filter((entry) => entry.distinct >= 2);
+    const byCardinality = [...ranked].sort((a, b) => a.distinct - b.distinct);
+    // inner: ≤ 6 distinct values AND repeats often (ratio ≤ 0.5)
+    const inner = byCardinality.find((entry) => entry.distinct <= 6 && entry.ratio <= 0.5);
+    // outer: a different dimension, still chartable on an axis (≤ 12)
+    const outer = byCardinality.find(
+      (entry) => entry !== inner && entry.distinct <= 12,
+    );
+    if (inner && outer) {
+      const dimA = outer.dimension;
+      const dimB = inner.dimension;
+      const measure = measures[0];
+      const aValues = distinctValues(rows, dimA).slice(0, 10);
+      const bValues = distinctValues(rows, dimB).slice(0, 6);
       const rowsByLabel: Record<string, number[]> = {};
       const data: SeriesPoint[] = aValues.map((a) => {
         const point: SeriesPoint = { label: a };
