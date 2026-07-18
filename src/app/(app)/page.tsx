@@ -150,13 +150,41 @@ export default async function OverviewPage() {
       value: headCount.toFixed(0),
       caption: "livestock on hand",
     });
-  } else {
+  } else if (stockValue.gt(0)) {
     kpis.push({
       label: "Stock value",
       value: formatMoney(Number(stockValue.toFixed(0))),
       caption: "at cost",
     });
+  } else {
+    kpis.push({
+      label: "Transactions",
+      value: String(windowRows.length),
+      caption: "recorded entries",
+    });
   }
+
+  // ── Stats strip: quick counts & averages, always reliable ──
+  const saleRows = windowRows.filter((row) => row.type === "sale");
+  const expenseRows = windowRows.filter((row) => row.type === "expense");
+  const sectionSet = new Set(
+    windowRows
+      .filter((row) => row.type === "expense" || row.type === "purchase")
+      .map((row) => row.categoryName),
+  );
+  const avgSale = saleRows.length > 0 ? summary.revenue.div(saleRows.length) : new Decimal(0);
+  const avgExpense =
+    expenseRows.length > 0 ? summary.expenses.div(expenseRows.length) : new Decimal(0);
+  const productCount = products.length;
+  const stats = [
+    { label: "Transactions", value: String(windowRows.length) },
+    { label: "Sales", value: String(saleRows.length) },
+    { label: "Cost items", value: String(expenseRows.length) },
+    { label: "Sections", value: String(sectionSet.size) },
+    { label: "Products", value: String(productCount) },
+    { label: "Avg sale", value: formatMoney(Number(avgSale.toFixed(0))) },
+    { label: "Avg cost item", value: formatMoney(Number(avgExpense.toFixed(0))) },
+  ];
 
   // ── Charts ──
   const revenueTrend = monthlyTrend(ledger, (row) =>
@@ -203,6 +231,21 @@ export default async function OverviewPage() {
       key: `cost-${index}`,
       label,
       revenue: Number(value.toFixed(0)),
+    }));
+
+  // Every cost section, ranked, with its item count as a hint — the full
+  // breakdown behind the donut.
+  const sectionCounts = new Map<string, number>();
+  for (const row of windowRows) {
+    if (row.type !== "expense" && row.type !== "purchase") continue;
+    sectionCounts.set(row.categoryName, (sectionCounts.get(row.categoryName) ?? 0) + 1);
+  }
+  const sectionsList: RankedItem[] = [...costGroups.entries()]
+    .sort((a, b) => b[1].minus(a[1]).toNumber())
+    .map(([name, value]) => ({
+      name,
+      revenue: Number(value.toFixed(0)),
+      hint: `${sectionCounts.get(name) ?? 0} بند`,
     }));
 
   // ── Ranked lists ──
@@ -292,6 +335,16 @@ export default async function OverviewPage() {
         ))}
       </div>
 
+      {/* Quick stats strip */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-7">
+        {stats.map((stat) => (
+          <div key={stat.label} className="kpi rounded-lg border bg-card px-3 py-2.5">
+            <p className="truncate text-xs text-muted-foreground">{stat.label}</p>
+            <p className="font-heading text-lg font-semibold tracking-tight">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
       {alerts.length > 0 ? <AlertsStrip data={alerts} /> : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
@@ -368,6 +421,23 @@ export default async function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {sectionsList.length > 3 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Where every dollar went</CardTitle>
+            <CardDescription>
+              All cost sections ranked · {windowLabel} · {formatMoney(Number(totalCosts.toFixed(0)))} total
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid gap-x-8 gap-y-3 md:grid-cols-2">
+              <TopProducts data={sectionsList.slice(0, Math.ceil(sectionsList.length / 2))} barClass="bg-chart-4" />
+              <TopProducts data={sectionsList.slice(Math.ceil(sectionsList.length / 2))} barClass="bg-chart-4" />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

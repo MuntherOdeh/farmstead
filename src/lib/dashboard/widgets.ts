@@ -68,6 +68,20 @@ function distinctValues(rows: NormalizedRow[], field: Field): string[] {
   return [...set];
 }
 
+// Subtotal / total rows are layout, not data — counting them double-counts
+// the file. \b is ASCII-only and fails after Arabic letters, so anchor on an
+// explicit space-or-end boundary instead. "غير مدفوع" precedes "مدفوع" so the
+// negative form isn't shadowed.
+const SUBTOTAL_RE =
+  /^(إجمالي|الإجمالي|الاجمالي|المجموع|غير مدفوع|مدفوع|total|subtotal|sum|grand total)(\s|$)/i;
+
+export function isSubtotalRow(row: NormalizedRow): boolean {
+  const candidates = [row.productName, row.categoryName].filter(
+    (v): v is string => typeof v === "string",
+  );
+  return candidates.some((v) => SUBTOTAL_RE.test(v.trim()));
+}
+
 function buildFields(mapping: ImportMapping, rows: NormalizedRow[]) {
   const measures: Field[] = [];
   const dimensions: Field[] = [];
@@ -90,8 +104,18 @@ function buildFields(mapping: ImportMapping, rows: NormalizedRow[]) {
   if (has("unit_price")) {
     measures.push({ key: "unitPrice", label: "Unit price", importance: 0.7, get: (row) => row.unitPrice });
   }
+  // Category / section (قسم) is the best grouping when present — item names
+  // like "شراء" repeat across sections and mislead if grouped on directly.
+  if (has("entity_type")) {
+    dimensions.push({
+      key: "categoryName",
+      label: headerOf("entity_type"),
+      importance: 1,
+      get: (row) => row.categoryName,
+    });
+  }
   if (has("entity_name")) {
-    dimensions.push({ key: "productName", label: headerOf("entity_name"), importance: 0.95, get: (row) => row.productName });
+    dimensions.push({ key: "productName", label: headerOf("entity_name"), importance: 0.9, get: (row) => row.productName });
   }
   if (has("party")) {
     dimensions.push({ key: "party", label: headerOf("party"), importance: 0.85, get: (row) => row.party });
@@ -148,8 +172,11 @@ const cardinalityFit = (distinct: number) =>
 
 export function generateWidgets(
   mapping: ImportMapping,
-  rows: NormalizedRow[],
+  allRows: NormalizedRow[],
 ): WidgetSpec[] {
+  // Drop the file's own subtotal/total rows so charts reflect the line items,
+  // not double-counted summaries.
+  const rows = allRows.filter((row) => !isSubtotalRow(row));
   const { period, measures, dimensions } = buildFields(mapping, rows);
   const widgets: WidgetSpec[] = [];
 
