@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Package,
   Settings,
+  Sheet,
   Upload,
   Users,
   type LucideIcon,
@@ -19,6 +20,7 @@ export interface NavItem {
 
 export const NAV_ITEMS: readonly NavItem[] = [
   { title: "Overview", href: "/", icon: LayoutDashboard, shortcut: "d" },
+  { title: "Datasets", href: "/datasets", icon: Sheet, shortcut: "e" },
   { title: "Import", href: "/import", icon: Upload, shortcut: "i" },
   { title: "Products", href: "/products", icon: Package, shortcut: "p" },
   { title: "Transactions", href: "/transactions", icon: ArrowLeftRight, shortcut: "t" },

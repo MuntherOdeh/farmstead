@@ -1,6 +1,6 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { getDb } from "@/db";
 import { seedDatabase } from "@/db/seed";
@@ -43,7 +43,10 @@ export async function clearAllData(): Promise<
     await db.delete(products);
     await db.delete(attributeDefs);
     await db.delete(parties);
-    await db.delete(categories).where(eq(categories.isSystem, false));
+    // Wipe ALL categories except the "Other" fallback — including demo presets
+    // (Sheep, Honey, …) so they never linger as empty clutter next to the real
+    // ones from the owner's own sheets.
+    await db.delete(categories).where(ne(categories.slug, "other"));
     await db.insert(auditLog).values({
       actorId: user.id,
       entity: "demo-data",
