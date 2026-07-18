@@ -33,13 +33,28 @@ import type {
   TransactionType,
 } from "@/lib/demo/overview";
 import { monthOf, monthlyTrend, profitBy, profitSummary, stockValuation } from "@/lib/analytics/calc";
+import { isNull } from "drizzle-orm";
+import { getDb } from "@/db";
+import { categories as categoriesTable } from "@/db/schema";
 import { loadLedger, loadProductSnapshots } from "@/lib/analytics/queries";
 import { formatMoney } from "@/lib/format";
 import { requireUser } from "@/lib/auth/require-user";
+import {
+  CategoryBreakdown,
+  type CategoryRow,
+} from "@/components/dashboard/category-breakdown";
 
 export default async function OverviewPage() {
   const user = await requireUser();
-  const [ledger, products] = await Promise.all([loadLedger(), loadProductSnapshots()]);
+  const db = await getDb();
+  const [ledger, products, categoryRows] = await Promise.all([
+    loadLedger(),
+    loadProductSnapshots(),
+    db
+      .select({ name: categoriesTable.name, kind: categoriesTable.kind })
+      .from(categoriesTable)
+      .where(isNull(categoriesTable.deletedAt)),
+  ]);
 
   // Fresh farm: nothing to chart yet — say so instead of a wall of zeros.
   if (ledger.length === 0 && products.length === 0) {
@@ -248,6 +263,36 @@ export default async function OverviewPage() {
       hint: `${sectionCounts.get(name) ?? 0} بند`,
     }));
 
+  // ── Every category, revenue AND cost, so cost-only sections (bees/honey)
+  // are visible — not hidden by a revenue-only chart ──
+  const revenueByCat = new Map<string, Decimal>();
+  for (const row of windowRows) {
+    if (row.type !== "sale") continue;
+    revenueByCat.set(
+      row.categoryName,
+      (revenueByCat.get(row.categoryName) ?? new Decimal(0)).plus(row.total ?? 0),
+    );
+  }
+  const productsByCat = new Map<string, number>();
+  for (const product of products) {
+    productsByCat.set(product.categoryName, (productsByCat.get(product.categoryName) ?? 0) + 1);
+  }
+  const kindByCat = new Map(categoryRows.map((c) => [c.name, c.kind]));
+  const allCatNames = new Set<string>([
+    ...revenueByCat.keys(),
+    ...costGroups.keys(),
+    ...productsByCat.keys(),
+  ]);
+  const categoryBreakdown: CategoryRow[] = [...allCatNames]
+    .map((name) => ({
+      name,
+      kind: kindByCat.get(name) ?? "other",
+      products: productsByCat.get(name) ?? 0,
+      revenue: Number((revenueByCat.get(name) ?? new Decimal(0)).toFixed(0)),
+      cost: Number((costGroups.get(name) ?? new Decimal(0)).toFixed(0)),
+    }))
+    .sort((a, b) => b.revenue + b.cost - (a.revenue + a.cost));
+
   // ── Ranked lists ──
   const topProducts: RankedItem[] = profitBy(windowRows, (row) => ({
     key: row.productId,
@@ -379,6 +424,21 @@ export default async function OverviewPage() {
           </CardContent>
         </Card>
       </div>
+
+      {categoryBreakdown.length > 0 ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>Your farm by category</CardTitle>
+            <CardDescription>
+              Every category — livestock, bees, dairy, crops and inputs — with what it
+              earned and what it cost · {windowLabel}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <CategoryBreakdown rows={categoryBreakdown} />
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
