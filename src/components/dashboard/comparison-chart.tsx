@@ -33,7 +33,7 @@ export function ComparisonChart({ data }: { data: ComparisonBar[] }) {
           tickFormatter={(value: number) => formatMoneyCompact(value)}
         />
         <ChartTooltip content={<ChartTooltipContent nameKey="label" />} />
-        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72}>
+        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72} isAnimationActive={false}>
           {chartData.map((bar) => (
             <Cell key={bar.label} fill={bar.colorVar} />
           ))}

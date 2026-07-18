@@ -43,6 +43,7 @@ export function CategoryDonut({
           strokeWidth={2}
           stroke="var(--card)"
           paddingAngle={1.5}
+          isAnimationActive={false}
         >
           {data.map((slice, index) => (
             <Cell key={slice.key} fill={`var(--chart-${(index % 5) + 1})`} />
