@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { Label, Pie, PieChart } from "recharts";
+import { Cell, Label, Pie, PieChart } from "recharts";
 import {
   ChartContainer,
   ChartLegend,
@@ -30,17 +30,13 @@ export function CategoryDonut({
   }, [data]);
 
   const total = data.reduce((sum, slice) => sum + slice.revenue, 0);
-  const chartData = data.map((slice) => ({
-    ...slice,
-    fill: `var(--color-${slice.key})`,
-  }));
 
   return (
     <ChartContainer config={config} className="mx-auto aspect-square max-h-72 w-full">
       <PieChart>
         <ChartTooltip content={<ChartTooltipContent nameKey="key" />} />
         <Pie
-          data={chartData}
+          data={data}
           dataKey="revenue"
           nameKey="key"
           innerRadius={62}
@@ -48,6 +44,9 @@ export function CategoryDonut({
           stroke="var(--card)"
           paddingAngle={1.5}
         >
+          {data.map((slice, index) => (
+            <Cell key={slice.key} fill={`var(--chart-${(index % 5) + 1})`} />
+          ))}
           <Label
             content={({ viewBox }) => {
               if (viewBox && "cx" in viewBox && "cy" in viewBox) {

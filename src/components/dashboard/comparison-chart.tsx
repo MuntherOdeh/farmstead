@@ -1,6 +1,6 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from "recharts";
 import {
   ChartContainer,
   ChartTooltip,
@@ -33,7 +33,11 @@ export function ComparisonChart({ data }: { data: ComparisonBar[] }) {
           tickFormatter={(value: number) => formatMoneyCompact(value)}
         />
         <ChartTooltip content={<ChartTooltipContent nameKey="label" />} />
-        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72} />
+        <Bar dataKey="value" radius={[6, 6, 0, 0]} maxBarSize={72}>
+          {chartData.map((bar) => (
+            <Cell key={bar.label} fill={bar.colorVar} />
+          ))}
+        </Bar>
       </BarChart>
     </ChartContainer>
   );

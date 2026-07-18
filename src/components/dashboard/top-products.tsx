@@ -22,10 +22,11 @@ export function TopProducts({
       {data.map((product) => (
         <li key={product.name} className="flex flex-col gap-1">
           <div className="flex items-baseline justify-between gap-2 text-sm">
-            <span className="truncate">
-              {product.name}
+            <span className="flex min-w-0 items-baseline gap-2">
+              {/* bdi isolates Arabic runs so name + hint don't visually merge */}
+              <bdi className="truncate">{product.name}</bdi>
               {product.hint ? (
-                <span className="ms-2 text-xs text-muted-foreground">{product.hint}</span>
+                <bdi className="shrink-0 text-xs text-muted-foreground">{product.hint}</bdi>
               ) : null}
             </span>
             <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums">
